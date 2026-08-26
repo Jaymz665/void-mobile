@@ -75,4 +75,4 @@ jobs:
           cp -r hostdir/binpkgs/* .
           git add .
           git commit -m "Update repository for ${{ matrix.arch }}"
-          git push --force origin repository-${{ matrix.arch }}-glibc
+          git push --force origin repository-${{ matrix.arch }}-glibc 
