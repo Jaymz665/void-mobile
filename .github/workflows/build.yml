@@ -9,18 +9,11 @@ jobs:
   build:
     runs-on: ubuntu-latest
     container:
-      image: voidlinux/voidlinux:latest
+      image: ghcr.io/void-linux/void-buildroot-glibc:latest
     strategy:
       matrix:
         arch: [aarch64]
     steps:
-      - name: Update system and install git
-        env:
-          XBPS_SSL_NO_VERIFY: "1"
-        run: |
-          xbps-install -Syu
-          xbps-install -y git openssl xz-utils
-
       - name: Checkout templates
         uses: actions/checkout@v5
         with:
@@ -34,8 +27,6 @@ jobs:
 
       - name: Bootstrap void-packages
         working-directory: void-packages
-        env:
-          XBPS_SSL_NO_VERIFY: "1"
         run: |
           ./xbps-src binary-bootstrap -A ${{ matrix.arch }}
           echo "XBPS_TARGET_ARCH=${{ matrix.arch }}" >> etc/conf
@@ -47,8 +38,6 @@ jobs:
 
       - name: Build packages
         working-directory: void-packages
-        env:
-          XBPS_SSL_NO_VERIFY: "1"
         run: |
           for pkg in $(ls ../templates/srcpkgs); do
             ./xbps-src -a ${{ matrix.arch }} -I pkg $pkg
