@@ -7,17 +7,21 @@ on:
 
 jobs:
   build:
+    name: Build for aarch64
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/void-linux/void-buildroot-glibc:latest
+      image: ghcr.io/void-linux/void-glibc-full:20250616R1
     strategy:
       matrix:
         arch: [aarch64]
     steps:
-      - name: Install required tools
+      - name: Prepare container
         run: |
-          xbps-install -S
-          xbps-install -y tar git openssl xz-utils
+          # Настраиваем репозитории, обновляем систему, ставим нужные пакеты
+          mkdir -p /etc/xbps.d && cp /usr/share/xbps.d/*-repository-*.conf /etc/xbps.d/
+          sed -i 's|repo-default|repo-ci|g' /etc/xbps.d/*-repository-*.conf
+          xbps-install -Syu xbps && xbps-install -yu && xbps-install -y sudo bash curl git tar openssl xz-utils
+          useradd -G xbuilder -M builder || true
 
       - name: Checkout templates
         uses: actions/checkout@v5
@@ -30,22 +34,31 @@ jobs:
           repository: void-linux/void-packages
           path: void-packages
 
-      - name: Bootstrap void-packages
-        working-directory: void-packages
-        run: |
-          ./xbps-src binary-bootstrap -A ${{ matrix.arch }}
-          echo "XBPS_TARGET_ARCH=${{ matrix.arch }}" >> etc/conf
-          echo "XBPS_BINPKG_REPOSITORY=https://repo-default.voidlinux.org/current/${{ matrix.arch }}" >> etc/conf
-
       - name: Copy custom templates
         run: |
-          cp -r templates/srcpkgs/* void-packages/srcpkgs/
+          cp -rv templates/srcpkgs/* void-packages/srcpkgs/
+          # Если есть файлы shlibs_append, shlibs_remove — можно добавить позже
 
-      - name: Build packages
+      - name: Prepare masterdir and bootstrap
         working-directory: void-packages
         run: |
+          chown -R builder:builder .
+          # Настройка зеркал и подготовка
+          sudo -Eu builder common/travis/set_mirror.sh
+          sudo -Eu builder common/travis/prepare.sh
+          common/travis/fetch-xtools.sh
+          # Дополнительно: bootstrap для кросс-архитектуры
+          ./xbps-src binary-bootstrap -A ${{ matrix.arch }}
+
+      - name: Build all packages
+        working-directory: void-packages
+        env:
+          ARCH: ${{ matrix.arch }}
+        run: |
+          export PATH="/opt/xbps/usr/bin/:$PATH"
+          # Собираем все пакеты из srcpkgs
           for pkg in $(ls ../templates/srcpkgs); do
-            ./xbps-src -a ${{ matrix.arch }} -I pkg $pkg
+            sudo -Eu builder ./xbps-src -a $ARCH -j"$(nproc)" pkg $pkg
           done
 
       - name: Index repository
