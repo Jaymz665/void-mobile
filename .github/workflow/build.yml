@@ -1,0 +1,66 @@
+name: Build Void packages
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch: [aarch64]
+    steps:
+      - name: Checkout templates
+        uses: actions/checkout@v4
+        with:
+          path: templates
+
+      - name: Checkout void-packages
+        uses: actions/checkout@v4
+        with:
+          repository: void-linux/void-packages
+          path: void-packages
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y git openssl xz-utils
+
+      - name: Bootstrap void-packages
+        working-directory: void-packages
+        run: |
+          ./xbps-src binary-bootstrap -A ${{ matrix.arch }}
+          echo "XBPS_TARGET_ARCH=${{ matrix.arch }}" >> etc/conf
+          echo "XBPS_BINPKG_REPOSITORY=https://repo-default.voidlinux.org/current/${{ matrix.arch }}" >> etc/conf
+
+      - name: Copy custom templates
+        run: |
+          cp -r templates/srcpkgs/* void-packages/srcpkgs/
+
+      - name: Build packages
+        working-directory: void-packages
+        run: |
+          for pkg in $(ls ../templates/srcpkgs); do
+            ./xbps-src -a ${{ matrix.arch }} -I pkg $pkg
+          done
+
+      - name: Index and sign repository (optional)
+        working-directory: void-packages
+        # пока без подписи, только индексация
+        run: |
+          xbps-rindex -a hostdir/binpkgs/*.xbps
+
+      - name: Deploy to repository branch
+        working-directory: void-packages
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git checkout --orphan repository-${{ matrix.arch }}-glibc || git checkout repository-${{ matrix.arch }}-glibc
+          rm -rf ./*
+          cp -r hostdir/binpkgs/* .
+          git add .
+          git commit -m "Update repository for ${{ matrix.arch }}" || true
+          git push --force origin repository-${{ matrix.arch }}-glibc
