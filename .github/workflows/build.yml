@@ -14,12 +14,12 @@ jobs:
         arch: [aarch64]
     steps:
       - name: Checkout templates
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           path: templates
 
       - name: Checkout void-packages
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: void-linux/void-packages
           path: void-packages
