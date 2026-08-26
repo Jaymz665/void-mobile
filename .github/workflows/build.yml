@@ -15,7 +15,9 @@ jobs:
         arch: [aarch64]
     steps:
       - name: Install required tools
-        run: xbps-install -y tar git openssl xz-utils
+        run: |
+          xbps-install -S
+          xbps-install -y tar git openssl xz-utils
 
       - name: Checkout templates
         uses: actions/checkout@v5
