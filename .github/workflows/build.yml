@@ -9,15 +9,13 @@ jobs:
   build:
     runs-on: ubuntu-latest
     container:
-      image: voidlinux/voidlinux:latest
+      image: ghcr.io/void-linux/void-linux:latest
     strategy:
       matrix:
         arch: [aarch64]
     steps:
-      - name: Install git and tools inside container
-        run: |
-          xbps-install -Syu
-          xbps-install -y git openssl xz-utils
+      - name: Install git and openssl
+        run: xbps-install -y git openssl xz-utils
 
       - name: Checkout templates
         uses: actions/checkout@v5
