@@ -1,0 +1,65 @@
+# Template file for 'phosh-mobile-settings'
+pkgname=phosh-mobile-settings
+version=0.56.0
+revision=1
+wrksrc="${pkgname}-${version}"
+build_style=meson
+configure_args="-Db_lto=true"
+hostmakedepends="
+	desktop-file-utils
+	meson
+	pkg-config
+	glib-devel
+	gettext
+	lm_sensors
+	wayland-devel
+	gtk-update-icon-cache
+	gtk4-update-icon-cache
+"
+makedepends="
+	feedbackd-devel
+	gmobile-devel
+	gnome-desktop-devel
+	gsound-devel
+	gtk4-devel
+	json-glib-devel
+	libadwaita-devel
+	libportal-devel
+	libportal-gtk4-devel
+	libsensors-devel
+	phoc-schemas
+	phosh-devel
+	phosh-schemas
+	pulseaudio-devel
+	libyaml-devel
+	cellbroadcastd-devel
+	
+"
+depends="
+	phoc-schemas
+	phosh-schemas
+"
+checkdepends="
+	xvfb-run
+	gsettings-desktop-schemas
+	phosh
+"
+short_desc="Settings app for mobile specific things"
+maintainer="Jaymz665 <jaymz665@gmail.com>"
+license="GPL-3.0-or-later"
+homepage="https://gitlab.gnome.org/World/Phosh/phosh-mobile-settings"
+distfiles="https://sources.phosh.mobi/releases/phosh-mobile-settings/phosh-mobile-settings-${version}.tar.xz"
+checksum=39e693aa0a306c17f501569a153a31c1a09ad3c8a24e3efdd005ce2842034380
+archs="aarch64 armv7l*"
+python_version=3
+
+if [ -z "$XBPS_CHECK_PKGS" ]; then
+	make_check_args="--suite unit"
+fi
+
+phosh-mobile-settings-lang_package() {
+	short_desc+=" - language files"
+	pkg_install() {
+		vmove usr/share/locale
+	}
+}

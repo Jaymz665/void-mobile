@@ -1,0 +1,48 @@
+# Template file for 'cameractrl'
+pkgname=cameractrl
+version=0.1.0
+revision=3
+wrksrc="${pkgname}"
+build_style=meson
+hostmakedepends="
+    pkg-config
+    blueprint-compiler
+    vala
+    meson
+    gettext
+    glib-devel
+    gtk-update-icon-cache
+    gtk4-update-icon-cache
+    desktop-file-utils
+    gobject-introspection
+    gtk4
+    libadwaita
+"
+makedepends="
+    libgudev-devel
+    gtk4-devel
+    gtk4-layer-shell-devel
+    libadwaita-devel
+    linux-headers
+	libgirepository-devel
+"
+depends="
+    gtk4
+    libadwaita
+    libgudev
+"
+short_desc="Nice camera manual focus control overlay"
+maintainer="Jaymz665 <your-email@example.com>"
+license="GPL-3.0-or-later"
+homepage="https://gitlab.com/NekoCWD/cameractrl"
+distfiles="https://gitlab.com/NekoCWD/cameractrl/-/archive/master/cameractrl-master.tar.gz"
+checksum=226933631c18d14bdc60ae1531447bb8df22c10c77f6472c43460b5e01f1063f
+
+pre_configure() {
+    export GI_TYPELIB_PATH=/usr/lib/girepository-1.0
+    export XDG_DATA_DIRS=/usr/share:${XDG_DATA_DIRS}
+}
+
+post_install() {
+    rm -f ${DESTDIR}/usr/share/glib-2.0/schemas/gschemas.compiled
+}

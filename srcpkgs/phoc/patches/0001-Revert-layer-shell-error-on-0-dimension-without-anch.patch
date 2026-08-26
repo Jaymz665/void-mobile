@@ -1,0 +1,18 @@
+--- a/subprojects/wlroots-0.19.x/types/wlr_layer_shell_v1.c
++++ b/subprojects/wlroots-0.19.x/types/wlr_layer_shell_v1.c
+@@ -366,6 +366,7 @@ static void layer_surface_role_client_commit(struct wlr_surface *wlr_surface) {
+ 		return;
+ 	}
+ 
++#if 0
+ 	const uint32_t vert = ZWLR_LAYER_SURFACE_V1_ANCHOR_TOP |
+ 		ZWLR_LAYER_SURFACE_V1_ANCHOR_BOTTOM;
+ 	if (surface->pending.desired_height == 0 && (anchor & vert) != vert) {
+@@ -374,6 +375,7 @@ static void layer_surface_role_client_commit(struct wlr_surface *wlr_surface) {
+ 			"height 0 requested without setting top and bottom anchors");
+ 		return;
+ 	}
++#endif
+ 
+ 	if ((anchor & surface->pending.exclusive_edge) != surface->pending.exclusive_edge) {
+ 		wlr_surface_reject_pending(wlr_surface, surface->resource,

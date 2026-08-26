@@ -1,0 +1,94 @@
+# Czech translation for libcall-ui.
+# Copyright (C) 2022 libcall-ui's COPYRIGHT HOLDER
+# This file is distributed under the same license as the libcall-ui package.
+# Daniel Rusek <mail@asciiwolf.com>, 2022.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: libcall-ui main\n"
+"Report-Msgid-Bugs-To: https://gitlab.gnome.org/World/Phosh/libcall-ui/"
+"issues/\n"
+"POT-Creation-Date: 2025-09-04 16:36+0000\n"
+"PO-Revision-Date: 2025-09-04 22:48+0200\n"
+"Last-Translator: Daniel Rusek <mail@asciiwolf.com>\n"
+"Language-Team: Czech <gnome-cs-list@gnome.org>\n"
+"Language: cs\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=3; plural=(n==1) ? 0 : (n>=2 && n<=4) ? 1 : "
+"2;\n"
+"X-Generator: Poedit 3.7\n"
+
+#: src/cui-call.c:336
+msgid "Call active"
+msgstr "Hovor aktivní"
+
+#: src/cui-call.c:338
+msgid "Call held"
+msgstr "Hovor přidržen"
+
+#: src/cui-call.c:340
+msgid "Calling…"
+msgstr "Volání…"
+
+#: src/cui-call.c:342
+msgid "Incoming call"
+msgstr "Příchozí hovor"
+
+#: src/cui-call.c:344
+msgid "Call ended"
+msgstr "Hovor skončil"
+
+#: src/cui-call.c:347 src/cui-call.c:367 src/cui-call-display.c:288
+msgid "Unknown"
+msgstr "Neznámé"
+
+#: src/cui-call.c:362
+msgid "Cellular"
+msgstr "Mobilní síť"
+
+#: src/cui-call.c:364
+msgid "SIP Voice"
+msgstr "Hlas SIP"
+
+#: src/cui-call-display.c:102
+msgid "Accepting call…"
+msgstr "Přijímání hovoru…"
+
+#: src/cui-call-display.c:117
+msgid "Hanging up…"
+msgstr "Zavěšování…"
+
+#~ msgid "Incoming phone call"
+#~ msgstr "Příchozí telefonní hovor"
+
+#~ msgid "Mute"
+#~ msgstr "Ztlumit"
+
+#~ msgid "Speaker"
+#~ msgstr "Reproduktor"
+
+#~ msgid "Add call"
+#~ msgstr "Přidat hovor"
+
+#~ msgid "Hold"
+#~ msgstr "Přidržet"
+
+#~ msgid "Dial Pad"
+#~ msgstr "Číselník"
+
+#~ msgid "Enter a number"
+#~ msgstr "Zadejte číslo"
+
+#~ msgid "Type a phone number"
+#~ msgstr "Zadejte telefonní číslo"
+
+#~ msgid "Call that phone number"
+#~ msgstr "Volat toto telefonní číslo"
+
+#~ msgid "This call is not encrypted"
+#~ msgstr "Tento hovor není zašifrován"
+
+#~ msgid "This call is encrypted"
+#~ msgstr "Tento hovor je zašifrován"

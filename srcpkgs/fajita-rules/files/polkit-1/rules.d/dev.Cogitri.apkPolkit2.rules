@@ -1,0 +1,16 @@
+polkit.addRule(function(action, subject) {
+     if ((action.id == "dev.Cogitri.apkPolkit2.AddPackages" ||
+         action.id == "dev.Cogitri.apkPolkit2.AddRepository" ||
+         action.id == "dev.Cogitri.apkPolkit2.ChangeRepository" ||
+         action.id == "dev.Cogitri.apkPolkit2.DeletePackages"||
+         action.id == "dev.Cogitri.apkPolkit2.RemoveRepository" ||
+         action.id == "dev.Cogitri.apkPolkit2.UpdateRepositories" ||
+         action.id == "dev.Cogitri.apkPolkit2.CachePackage" ||
+         action.id == "dev.Cogitri.apkPolkit2.UpgradePackages") &&
+        subject.active == true && subject.local == true &&
+        subject.isInGroup("wheel")) {
+            return polkit.Result.YES;
+    }
+
+    return polkit.Result.NOT_HANDLED;
+});

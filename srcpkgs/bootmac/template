@@ -1,0 +1,15 @@
+# Template file for 'bootmac'
+pkgname=bootmac
+version=0.7.1
+revision=2
+build_style=meson
+configure_args="-Dsystemd_units=false"
+hostmakedepends="pkg-config meson gobject-introspection prelink-cross qemu-user-aarch64"
+depends="bluez"
+short_desc="Configure MAC addresses at boot"
+maintainer="Jaymz665 <jaymz665@gmail.com>"
+license="GPL-3.0-or-later"
+homepage="https://gitlab.postmarketos.org/postmarketOS/bootmac"
+distfiles="https://gitlab.postmarketos.org/postmarketOS/bootmac/-/archive/v${version}/bootmac-v${version}.tar.gz"
+checksum=679779ef447b020115776a4f4adf2170f9f1f593cf8ee1fd6bb969e2f8fedf27
+archs="aarch64 armv7l x86_64"

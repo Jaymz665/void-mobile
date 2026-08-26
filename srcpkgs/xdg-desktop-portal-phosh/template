@@ -1,0 +1,30 @@
+# Template file for 'xdg-desktop-portal-phosh'
+pkgname=xdg-desktop-portal-phosh
+version=0.52.0
+revision=1
+build_style=meson
+build_helper=rust
+hostmakedepends="pkg-config meson glib-devel python3-docutils libadwaita-devel rust cargo rust-std cross-aarch64-linux-gnu"
+makedepends="gnome-desktop-devel xdg-desktop-portal libadwaita-devel"
+depends="gsettings-desktop-schemas xdg-desktop-portal"
+short_desc="xdg-desktop-portal implementation using GTK/GNOME/Phosh"
+maintainer="Jaymz665 <jaymz665@gmail.com>"
+license="GPL-3.0-or-later"
+homepage="https://gitlab.gnome.org/World/Phosh/xdg-desktop-portal-phosh"
+distfiles="https://sources.phosh.mobi/releases/xdg-desktop-portal-phosh/xdg-desktop-portal-phosh-${version}.tar.xz"
+checksum=825f5b689135d6bc375f78178c46e93d42522273c3d6b7469d0477584689a250
+
+
+wrksrc="xdg-desktop-portal-phosh-${version}"
+
+pre_configure() {
+    vsed -i 's/\.rc/_rc/' meson.build
+}
+
+make_check=no 
+
+post_install() {
+    rm -f ${DESTDIR}/usr/share/glib-2.0/schemas/gschemas.compiled
+}
+
+

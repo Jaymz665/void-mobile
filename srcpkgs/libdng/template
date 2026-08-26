@@ -1,0 +1,39 @@
+# Template file for 'libdng'
+pkgname=libdng
+version=0.2.2
+revision=1
+wrksrc="${pkgname}-${version}"
+build_style=meson
+hostmakedepends="pkg-config meson scdoc"
+makedepends="tiff-devel"
+short_desc="Interface library between libtiff and DNG format"
+maintainer="Jaymz665 <your-email@example.com>"
+license="MIT"
+homepage="https://gitlab.com/megapixels-org/libdng"
+distfiles="https://gitlab.com/megapixels-org/libdng/-/archive/${version}/libdng-${version}.tar.gz"
+checksum=f0f99a8e47c9bd67087238b54ae33a9692fc32e855362c98c94b6aaceea96821
+archs="aarch64 armv7l* x86_64 i686"
+python_version=3
+
+# Подпакеты
+libdng-utils_package() {
+    short_desc+=" - DNG manipulation utilities"
+    pkg_install() {
+        vmove usr/bin
+    }
+}
+
+libdng-devel_package() {
+    short_desc+=" - development files"
+    depends="${sourcepkg}>=${version}_${revision}"
+    pkg_install() {
+        vmove usr/include
+        vmove usr/lib/pkgconfig
+        vmove "usr/lib/*.so"
+    }
+}
+
+
+post_install() {
+    vlicense LICENSE
+}

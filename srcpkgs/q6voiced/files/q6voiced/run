@@ -1,0 +1,6 @@
+#!/bin/sh
+exec 2>&1
+. /etc/default/q6voiced
+Q6VOICE_CARD=${Q6VOICE_CARD:-0}
+Q6VOICE_DEVICE=${Q6VOICE_DEVICE:-6}
+exec /usr/bin/q6voiced "hw:${Q6VOICE_CARD},${Q6VOICE_DEVICE}"

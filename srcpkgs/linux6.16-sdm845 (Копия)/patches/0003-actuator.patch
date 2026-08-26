@@ -1,0 +1,30 @@
+From a735baaae74a406f4c7eb57b713e835a5ab09c29 Mon Sep 17 00:00:00 2001
+From: Vasiliy Doylov <nekocwd@mainlining.org>
+Date: Sat, 8 Mar 2025 13:29:59 +0300
+Subject: [PATCH] arm64: dts: qcom: sdm845-oneplus-common: change actuator
+
+Signed-off-by: Vasiliy Doylov <nekocwd@mainlining.org>
+---
+ arch/arm64/boot/dts/qcom/sdm845-oneplus-common.dtsi | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/qcom/sdm845-oneplus-common.dtsi b/arch/arm64/boot/dts/qcom/sdm845-oneplus-common.dtsi
+index d07f51aca7b69..0d885a2da3f38 100644
+--- a/arch/arm64/boot/dts/qcom/sdm845-oneplus-common.dtsi
++++ b/arch/arm64/boot/dts/qcom/sdm845-oneplus-common.dtsi
+@@ -650,9 +650,9 @@ imx371_ep: endpoint {
+ };
+ 
+ &cci_i2c1 {
+-	sub_cam_actuator: actuator@74 {
+-		compatible = "onnn,lc898217xc";
+-		reg = <0x74>;
++	sub_cam_actuator: actuator@d {
++		compatible = "sa,sa3103";
++		reg = <0x0d>;
+ 		vcc-supply = <&sub_cam_vaf>;
+ 	};
+ 
+-- 
+GitLab
+

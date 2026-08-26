@@ -1,0 +1,143 @@
+# Dutch translations for PACKAGE package.
+# Copyright (C) 2021 THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# Erik Nijenhuis <erik@xerdi.com>, 2021.
+# Nathan Follens <nfollens@gnome.org>, 2021-2022, 2025.
+# Jan Jasper de Kroon <jajadekroon@gmail.com>, 2022.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: \n"
+"Report-Msgid-Bugs-To: https://gitlab.gnome.org/World/Phosh/libcall-ui/"
+"issues/\n"
+"POT-Creation-Date: 2025-09-12 15:59+0000\n"
+"PO-Revision-Date: 2025-09-13 23:04+0200\n"
+"Last-Translator: Nathan Follens <nfollens@gnome.org>\n"
+"Language-Team: GNOME-NL https://matrix.to/#/#nl:gnome.org\n"
+"Language: nl\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"X-Generator: Poedit 3.6\n"
+
+#: src/cui-call.c:336
+msgid "Call active"
+msgstr "Oproep actief"
+
+#: src/cui-call.c:338
+msgid "Call held"
+msgstr "Oproep in wacht"
+
+#: src/cui-call.c:340
+msgid "Calling…"
+msgstr "Bellen…"
+
+#: src/cui-call.c:342
+msgid "Incoming call"
+msgstr "Inkomende oproep"
+
+#: src/cui-call.c:344
+msgid "Call ended"
+msgstr "Oproep beëindigd"
+
+#: src/cui-call.c:347 src/cui-call.c:367 src/cui-call-display.c:288
+msgid "Unknown"
+msgstr "Onbekend"
+
+#: src/cui-call.c:362
+msgid "Cellular"
+msgstr "Mobiel"
+
+#: src/cui-call.c:364
+msgid "SIP Voice"
+msgstr "SIP-spraak"
+
+#: src/cui-call-display.c:102
+msgid "Accepting call…"
+msgstr "Oproep opnemen…"
+
+#: src/cui-call-display.c:117
+msgid "Hanging up…"
+msgstr "Ophangen…"
+
+#~ msgid "Incoming phone call"
+#~ msgstr "Inkomende oproep"
+
+#~ msgid "Mute"
+#~ msgstr "Dempen"
+
+#~ msgid "Speaker"
+#~ msgstr "Luidspreker"
+
+#~ msgid "Add call"
+#~ msgstr "Oproep toevoegen"
+
+#~ msgid "Hold"
+#~ msgstr "In de wacht zetten"
+
+#~ msgid "Dial Pad"
+#~ msgstr "Toetsenblok"
+
+#~ msgid "Enter a number"
+#~ msgstr "Voer een nummer in"
+
+#~ msgid "Type a phone number"
+#~ msgstr "Typ een telefoonnummer"
+
+#~ msgid "Call that phone number"
+#~ msgstr "Bel dat telefoonnummer"
+
+#~ msgid "This call is not encrypted"
+#~ msgstr "Dit gesprek is niet versleuteld"
+
+#~ msgid "This call is encrypted"
+#~ msgstr "Dit gesprek is versleuteld"
+
+#~ msgid "Hang up"
+#~ msgstr "Ophangen"
+
+#~ msgid "Answer"
+#~ msgstr "Opnemen"
+
+#~ msgid "Hide the dial pad"
+#~ msgstr "Toetsenblok verbergen"
+
+#~ msgid "Call-UI Demo"
+#~ msgstr "Oproep-UI-demo"
+
+#~ msgid "Back"
+#~ msgstr "Terug"
+
+# Oproep-UI is in feite de naam van de App. Vandaar dat ik deze met hoofdletter heb gezet.
+#~ msgid "Welcome to Call-UI Demo"
+#~ msgstr "Welkom bij de Oproep-UI-demo"
+
+#~ msgid "This is a tour of the features the library has to offer."
+#~ msgstr ""
+#~ "Dit is een rondleiding langs de functies die de softwarebibliotheek te "
+#~ "bieden heeft."
+
+#~ msgid "Welcome"
+#~ msgstr "Welkom"
+
+#~ msgid "Call Display"
+#~ msgstr "Belscherm"
+
+#~ msgid "A simple dial pad to enter phone numbers."
+#~ msgstr "Een eenvoudig numeriek toetsenblok om telefoonnummers in te voeren."
+
+#~ msgid "Keypad"
+#~ msgstr "Toetsenblok"
+
+#~ msgid "A number keypad."
+#~ msgstr "Een numeriek toetsenblok."
+
+#~ msgid "Show letters"
+#~ msgstr "Letters tonen"
+
+#~ msgid "Show symbols"
+#~ msgstr "Symbolen tonen"
+
+#~ msgid "Key pad"
+#~ msgstr "Toetsenblok"

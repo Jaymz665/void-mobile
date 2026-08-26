@@ -1,0 +1,31 @@
+# Template file for 'libssc'
+pkgname=libssc
+version=0.4.2
+revision=2
+build_style=meson
+hostmakedepends="pkg-config protobuf protobuf-c glib-devel gobject-introspection prelink-cross qemu-user-aarch64"
+makedepends="glib-devel libqrtr-glib-devel protobuf-c-devel libqmi-devel python-devel"
+depends="python3-gobject python3-protobuf"
+short_desc="Library to expose Qualcomm Sensor Core sensors"
+maintainer="jaymz665"
+license="GPL-3.0-or-later"
+homepage="https://libssc.dylanvanassche.be/"
+distfiles="https://codeberg.org/DylanVanAssche/libssc/archive/v${version}.tar.gz"
+checksum=cd29d26c226b45a1931695863bdc7f267e095f1e09b53c1383fb626a3c69969a
+
+post_install() {
+    if [ -d "${DESTDIR}/usr/include/libssc/mocking" ]; then
+        vmkdir usr/lib/python3.14/site-packages
+        cp ${DESTDIR}/usr/include/libssc/mocking/*.py ${DESTDIR}/usr/lib/python3.14/site-packages/
+    fi
+}
+
+libssc-devel_package() {
+	depends="${makedepends} ${sourcepkg}-${version}_${revision}"
+	short_desc+=" - development files"
+	pkg_install() {
+		vmove usr/include
+		vmove usr/lib/pkgconfig
+		vmove "usr/lib/*.so"
+	}
+}

@@ -1,0 +1,28 @@
+# Template file for 'cosmic-files'
+pkgname=cosmic-files
+version=1.2.0
+revision=2
+build_style=cargo
+hostmakedepends="pkg-config just"
+makedepends="libxkbcommon-devel libglib-devel gvfs"
+short_desc="File manager for the COSMIC desktop environment"
+maintainer="Daniel Martinez <danielmartinez@cock.li>"
+license="GPL-3.0-only"
+homepage="https://github.com/pop-os/cosmic-files"
+distfiles="https://github.com/pop-os/cosmic-files/archive/refs/tags/epoch-${version}.tar.gz"
+checksum=1cbae3594d2b6b91ffa36abbbe96cd7c59f9f7df7e392d44685663f4c6a686c2
+
+post_extract() {
+    if ! command -v just >/dev/null; then
+        echo "ERROR: just is required but not found"
+        exit 1
+    fi
+}
+
+do_build() {
+    just build-release
+}
+
+do_install() {
+    just --set rootdir "${DESTDIR}" --set prefix "/usr" install
+}

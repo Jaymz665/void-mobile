@@ -1,0 +1,64 @@
+# Slovenian translation for libcall-ui.
+# Copyright (C) 2022 libcall-ui's COPYRIGHT HOLDER
+# This file is distributed under the same license as the libcall-ui package.
+#
+# Matej Urbančič <mateju@src.gnome.org>, 2022–
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: libcall-ui main\n"
+"Report-Msgid-Bugs-To: https://gitlab.gnome.org/World/Phosh/libcall-ui/"
+"issues/\n"
+"POT-Creation-Date: 2025-08-28 13:32+0000\n"
+"PO-Revision-Date: 2025-08-28 16:32+0200\n"
+"Last-Translator: Martin Srebotnjak <miles@filmsi.net>\n"
+"Language-Team: Slovenian GNOME Translation Team <gnome-si@googlegroups."
+"com>\n"
+"Language: sl_SI\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=4; plural=(n%100==1 ? 1 : n%100==2 ? 2 : n%100==3 || "
+"n%100==4 ? 3 : 0);\n"
+"X-Poedit-SourceCharset: utf-8\n"
+"X-Generator: Poedit 2.2.1\n"
+
+#: src/cui-call.c:336
+msgid "Call active"
+msgstr "Klic dejaven"
+
+#: src/cui-call.c:338
+msgid "Call held"
+msgstr "Klic zadržan"
+
+#: src/cui-call.c:340
+msgid "Calling…"
+msgstr "Klicanje …"
+
+#: src/cui-call.c:342
+msgid "Incoming call"
+msgstr "Dohodni klic"
+
+#: src/cui-call.c:344
+msgid "Call ended"
+msgstr "Klic končan"
+
+#: src/cui-call.c:347 src/cui-call.c:367 src/cui-call-display.c:288
+msgid "Unknown"
+msgstr "Neznano"
+
+#: src/cui-call.c:362
+msgid "Cellular"
+msgstr "Mobilno"
+
+#: src/cui-call.c:364
+msgid "SIP Voice"
+msgstr "Glasovno SIP"
+
+#: src/cui-call-display.c:102
+msgid "Accepting call…"
+msgstr "Sprejemanje klica ..."
+
+#: src/cui-call-display.c:117
+msgid "Hanging up…"
+msgstr "Prekinjanje …"

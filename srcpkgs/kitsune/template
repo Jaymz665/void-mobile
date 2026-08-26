@@ -1,0 +1,57 @@
+# Template file for 'kitsune'
+pkgname=kitsune
+version=0.8.0
+revision=1
+build_style=meson
+hostmakedepends="meson pkg-config blueprint-compiler gettext glib-devel
+ gtk-update-icon-cache gtk4-update-icon-cache desktop-file-utils
+ gobject-introspection gtk4-devel libadwaita-devel
+ gstreamer1-devel gst-plugins-base1-devel libsoup3-devel"
+makedepends="python3-devel gtk4-devel libadwaita-devel gstreamer1-devel
+ gst-plugins-base1-devel gst-plugins-bad1-devel libsoup3-devel
+ python3-gobject-devel"
+depends="python3 python3-gobject gtk4 libadwaita gstreamer1
+ gst-plugins-base1 gst-plugins-good1 gst-plugins-bad1 gst-libav
+ libsoup3"
+short_desc="A modern anime streaming app for desktop"
+maintainer="Jaymz665 <jaymz665@gmail.com>"
+license="GPL-3.0-or-later"
+homepage="https://altlinux.space/armatik/Kitsune"
+distfiles="kitsune-${version}.tar.gz"
+checksum=d2f7774d3661344512b59d0a9413400dcf1a4dd334b1f985f0c3b6c424b4524f
+
+export DESTDIR="/dest"
+
+if [ -n "$CROSS_BUILD" ]; then
+    export GI_TYPELIB_PATH="${XBPS_CROSS_BASE}/usr/lib/girepository-1.0"
+    export XDG_DATA_DIRS="${XBPS_CROSS_BASE}/usr/share:${XDG_DATA_DIRS:-}"
+    
+    pre_configure() {
+        msg_normal "kitsune: Using GI_TYPELIB_PATH=${GI_TYPELIB_PATH}\n"
+        msg_normal "kitsune: Using XDG_DATA_DIRS=${XDG_DATA_DIRS}\n"
+        
+        if [ ! -f "${GI_TYPELIB_PATH}/Gtk-4.0.typelib" ] || [ ! -f "${GI_TYPELIB_PATH}/Adw-1.typelib" ]; then
+            msg_error "kitsune: Required typelib files not found!\n"
+        fi
+    }
+else
+    export GI_TYPELIB_PATH="/usr/lib/girepository-1.0"
+    export XDG_DATA_DIRS="/usr/share:${XDG_DATA_DIRS:-}"
+    
+    pre_configure() {
+        msg_normal "kitsune: Using GI_TYPELIB_PATH=${GI_TYPELIB_PATH}\n"
+        msg_normal "kitsune: Using XDG_DATA_DIRS=${XDG_DATA_DIRS}\n"
+    }
+fi
+
+post_install() {
+    rm -f "${DESTDIR}/usr/share/glib-2.0/schemas/gschemas.compiled"
+    
+    if [ -d "${DESTDIR}/usr/share/icons/hicolor" ]; then
+        gtk-update-icon-cache -q -f "${DESTDIR}/usr/share/icons/hicolor" || true
+    fi
+    
+    if [ -d "${DESTDIR}/usr/share/applications" ]; then
+        update-desktop-database -q || true
+    fi
+}

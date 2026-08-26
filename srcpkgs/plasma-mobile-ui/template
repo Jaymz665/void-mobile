@@ -1,0 +1,86 @@
+# Template file for 'plasma-mobile-ui'
+pkgname=plasma-mobile-ui
+version=1.0
+revision=1
+short_desc="KDE Plasma Mobile UI meta package for Void Linux"
+maintainer="Jaymz665 <jaymz665@gmail.com>"
+license="GPL-3.0-or-later"
+homepage="https://plasma-mobile.org"
+archs="aarch64* x86_64*"
+distfiles=""
+checksum=
+
+depends="
+	plasma-mobile
+	bluedevil
+	breeze
+	breeze-gtk
+	elogind
+	feedbackd
+	callaudiod
+	geoclue2
+	iio-sensor-proxy
+	kunifiedpush
+	kscreen
+	kwallet-pam
+	ModemManager
+	polkit-kde-agent
+	pipewire
+	pulseaudio
+	powerdevil
+	NetworkManager
+	udisks2
+	xdg-desktop-portal-kde
+	dbus-x11
+	plasma-nano
+	plasma-nm
+	plasma-pa
+	plasma-workspace
+	qqc2-breeze-style
+"
+
+do_install() {
+	vinstall "${FILESDIR}/qtlogging.ini" 0644 etc/xdg/QtProject
+	vinstall "${FILESDIR}/kscreenlockerrc" 0644 etc/xdg
+	vinstall "${FILESDIR}/maliit-plasmamobile.json" 0644 usr/share/maliit/keyboard2/devices
+	vinstall "${FILESDIR}/drkonqirc" 0644 etc/xdg
+	vinstall "${FILESDIR}/gtk-app-wayland.sh" 0755 etc/profile.d
+}
+
+plasma-mobile-ui-extras_package() {
+	short_desc+=" - recommended mobile apps"
+	metapackage=yes
+	depends="
+		dolphin
+		kclock
+		krecorder
+		kweather
+		calls
+		gnome-contacts
+		konsole
+	"
+}
+
+plasma-mobile-ui-extras-web_package() {
+	short_desc+=" - web-related mobile apps"
+	metapackage=yes
+	depends="
+		neochat
+		okular
+		tokodon
+	"
+}
+
+plasma-mobile-ui-extras-more_package() {
+	short_desc+=" - additional KDE mobile apps"
+	metapackage=yes
+	depends="
+		audiotube
+		elisa
+		kitinerary
+		kasts
+		kdeconnect
+	"
+}
+
+

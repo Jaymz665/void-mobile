@@ -1,0 +1,23 @@
+# Template file for 'fajita-rules'
+pkgname=fajita-rules
+version=1.0
+revision=1
+short_desc="Custom udev and polkit rules"
+maintainer="Jaymz665 <jaymz665@gmail.com>"
+license="Custom"
+homepage="https://example.com"
+# Пустые переменные, так как мы не скачиваем исходники
+distfiles=""
+checksum=""
+
+do_install() {
+    # Установка udev правил
+    if [ -d "${FILESDIR}/udev/rules.d" ]; then
+        vcopy "udev/rules.d/*" "/usr/lib/udev/rules.d/"
+    fi
+    
+    # Установка polkit правил
+    if [ -d "${FILESDIR}/polkit-1/rules.d" ]; then
+        vcopy "polkit-1/rules.d/*" "/usr/share/polkit-1/rules.d/"
+    fi
+}

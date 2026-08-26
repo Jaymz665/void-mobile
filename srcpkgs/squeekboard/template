@@ -1,0 +1,61 @@
+# Template file for 'squeekboard'
+pkgname=squeekboard
+version=1.43.1
+revision=2
+wrksrc=${pkgname}-v${version}
+build_style=meson
+build_helper=rust
+hostmakedepends="
+    glib-devel gettext pkg-config cargo wayland-devel meson"
+makedepends="
+    rust gtk+3-devel gnome-desktop-devel libfeedback-devel
+    libxkbcommon-devel libbsd-devel pango-devel cairo-devel
+    wayland-protocols"
+depends="feedbackd"
+short_desc="On-screen keyboard for Wayland"
+maintainer="Jaymz665"
+license="GPL-3.0-or-later"
+homepage="https://gitlab.gnome.org/World/Phosh/squeekboard"
+distfiles="${homepage}/-/archive/v${version}/squeekboard-v${version}.tar.gz"
+checksum=64c73636f6d8a6ffe9f1094c4084b184db3f60ac4e02bf8bff860060308c61ab
+
+post_extract() {
+    # Настройка cargo для использования зеркала
+    mkdir -p ${wrksrc}/.cargo
+    cat > ${wrksrc}/.cargo/config.toml <<'EOF'
+[source.crates-io]
+replace-with = "tuna"
+
+[source.tuna]
+registry = "https://mirrors.tuna.tsinghua.edu.cn/git/crates.io-index.git"
+
+[source.ustc]
+registry = "https://mirrors.ustc.edu.cn/crates.io-index"
+
+[source.rustcc]
+registry = "https://crates.rustcc.cn/crates.io-index"
+EOF
+}
+
+post_install() {
+    chmod +x ${DESTDIR}/usr/bin/squeekboard-entry 2>/dev/null || true
+    
+    # Устанавливаем правильный .desktop файл для OSK0 (как в Alpine)
+    vmkdir usr/share/applications
+    cat > ${DESTDIR}/usr/share/applications/sm.puri.OSK0.desktop <<EOF
+[Desktop Entry]
+Type=Application
+Name=On-screen keyboard
+Comment=Default on-screen keyboard
+Exec=/usr/bin/squeekboard
+Categories=System;GNOME;Core;
+OnlyShowIn=GNOME;
+NoDisplay=true
+X-GNOME-Autostart-Phase=Panel
+X-GNOME-Provides=inputmethod
+X-GNOME-Autostart-Notify=true
+X-GNOME-AutoRestart=true
+EOF
+    
+    vlicense COPYING
+}
