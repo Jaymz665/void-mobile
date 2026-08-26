@@ -20,7 +20,7 @@ jobs:
           # Настраиваем репозитории, обновляем систему, ставим нужные пакеты
           mkdir -p /etc/xbps.d && cp /usr/share/xbps.d/*-repository-*.conf /etc/xbps.d/
           sed -i 's|repo-default|repo-ci|g' /etc/xbps.d/*-repository-*.conf
-          xbps-install -Syu xbps && xbps-install -yu && xbps-install -y sudo bash curl git tar openssl xz-utils
+          xbps-install -Syu xbps && xbps-install -yu && xbps-install -y sudo bash curl git tar openssl xz
           useradd -G xbuilder -M builder || true
 
       - name: Checkout templates
