@@ -1,6 +1,0 @@
-_build/
-.meson-subproject-wrap-hash.txt
-po/call-ui.pot
-po/messages.mo
-po/missing
-

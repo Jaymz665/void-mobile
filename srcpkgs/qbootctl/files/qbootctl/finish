@@ -1,7 +1,0 @@
-#!/bin/sh
-
-if [ "$1" = "0" ]; then
-	touch /run/qbootctl-done
-	sv down /etc/sv/qbootctl
-	fi
-exit 0

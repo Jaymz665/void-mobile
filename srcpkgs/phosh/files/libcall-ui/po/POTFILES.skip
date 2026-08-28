@@ -1,3 +1,0 @@
-# List of source files that should *not* be translated.
-examples/cui-demo-window.ui
-examples/cui-demo-window.c
