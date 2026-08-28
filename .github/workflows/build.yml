@@ -11,16 +11,18 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: ghcr.io/void-linux/void-glibc-full:20250616R1
+      options: --privileged
+      volumes:
+        - /dev:/dev
     strategy:
       matrix:
         arch: [aarch64]
     steps:
       - name: Prepare container
         run: |
-          # Настраиваем репозитории, обновляем систему, ставим нужные пакеты
           mkdir -p /etc/xbps.d && cp /usr/share/xbps.d/*-repository-*.conf /etc/xbps.d/
           sed -i 's|repo-default|repo-ci|g' /etc/xbps.d/*-repository-*.conf
-          xbps-install -Syu xbps && xbps-install -yu && xbps-install -y sudo bash curl git tar openssl xz
+          xbps-install -Syu xbps && xbps-install -yu && xbps-install -y sudo bash curl git
           useradd -G xbuilder -M builder || true
 
       - name: Checkout templates
@@ -37,18 +39,14 @@ jobs:
       - name: Copy custom templates
         run: |
           cp -rv templates/srcpkgs/* void-packages/srcpkgs/
-          # Если есть файлы shlibs_append, shlibs_remove — можно добавить позже
 
       - name: Prepare masterdir and bootstrap
         working-directory: void-packages
         run: |
           chown -R builder:builder .
-          # Настройка зеркал и подготовка
           sudo -Eu builder common/travis/set_mirror.sh
           sudo -Eu builder common/travis/prepare.sh
           common/travis/fetch-xtools.sh
-          # Дополнительно: bootstrap для кросс-архитектуры
-          ./xbps-src binary-bootstrap -A ${{ matrix.arch }}
 
       - name: Build all packages
         working-directory: void-packages
@@ -56,7 +54,6 @@ jobs:
           ARCH: ${{ matrix.arch }}
         run: |
           export PATH="/opt/xbps/usr/bin/:$PATH"
-          # Собираем все пакеты из srcpkgs
           for pkg in $(ls ../templates/srcpkgs); do
             sudo -Eu builder ./xbps-src -a $ARCH -j"$(nproc)" pkg $pkg
           done
