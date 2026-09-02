@@ -62,7 +62,7 @@ jobs:
           sudo -Eu builder common/travis/prepare.sh
           common/travis/fetch-xtools.sh
 
-      - name: Build libcallaudio
+      - name: Build libcallaudio first
         working-directory: void-packages
         env:
           ARCH: ${{ matrix.arch }}
@@ -70,21 +70,13 @@ jobs:
           export PATH="/opt/xbps/usr/bin/:$PATH"
           sudo -Eu builder ./xbps-src -a $ARCH -j"$(nproc)" pkg libcallaudio
 
-      - name: Build gmobile
-        working-directory: void-packages
-        env:
-          ARCH: ${{ matrix.arch }}
-        run: |
-          export PATH="/opt/xbps/usr/bin/:$PATH"
-          sudo -Eu builder ./xbps-src -a $ARCH -j"$(nproc)" pkg gmobile
-
       - name: Build remaining packages
         working-directory: void-packages
         env:
           ARCH: ${{ matrix.arch }}
         run: |
           export PATH="/opt/xbps/usr/bin/:$PATH"
-          for pkg in $(ls ../templates/srcpkgs | grep -v -e libcallaudio -e gmobile); do
+          for pkg in $(ls ../templates/srcpkgs | grep -v libcallaudio); do
             sudo -Eu builder ./xbps-src -a $ARCH -j"$(nproc)" pkg $pkg
           done
 
