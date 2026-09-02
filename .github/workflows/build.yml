@@ -160,12 +160,19 @@ jobs:
           xbps-rindex -a hostdir/binpkgs/*.xbps
 
       - name: Deploy to GitHub branch
-        working-directory: void-packages
+        working-directory: extra
         run: |
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
+          # Удаляем старую ветку, если есть
+          git branch -D repository-${{ env.ARCH }}-glibc 2>/dev/null || true
           git checkout --orphan repository-${{ env.ARCH }}-glibc
-          cp -r hostdir/binpkgs/* .
+          # Копируем бинарники
+          cp -r ../void-packages/hostdir/binpkgs/* .
           git add .
-          git commit -m "Update repository for ${{ env.ARCH }}"
-          git push --force origin repository-${{ env.ARCH }}-glibc
+          if git diff --staged --quiet; then
+            echo "No changes to commit, skipping push"
+          else
+            git commit -m "Update repository for ${{ env.ARCH }}"
+            git push --force origin repository-${{ env.ARCH }}-glibc
+          fi
