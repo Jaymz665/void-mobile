@@ -1,49 +1,90 @@
-name: Build Void packages
+name: build
 
 on:
   push:
     branches: [ main ]
+    paths:
+      - "srcpkgs/**"
   workflow_dispatch:
 
 jobs:
   build:
-    name: Build for aarch64
+    name: Build packages (aarch64)
     runs-on: ubuntu-latest
     container:
       image: ghcr.io/void-linux/void-glibc-full:20250616R1
       options: --privileged
       volumes:
         - /dev:/dev
-    strategy:
-      matrix:
-        arch: [aarch64]
+    env:
+      ARCH: aarch64
+      BOOTSTRAP: x86_64
+      TEST: 0
+    permissions:
+      contents: write
+
     steps:
       - name: Prepare container
         run: |
           mkdir -p /etc/xbps.d && cp /usr/share/xbps.d/*-repository-*.conf /etc/xbps.d/
           sed -i 's|repo-default|repo-ci|g' /etc/xbps.d/*-repository-*.conf
-          xbps-install -Syu xbps && xbps-install -yu && xbps-install -y sudo bash curl git
-          useradd -G xbuilder -M builder || true
+          xbps-install -Syu xbps && xbps-install -yu && xbps-install -y sudo bash curl git rsync
+          useradd -G xbuilder -M builder
 
-      - name: Checkout templates
-        uses: actions/checkout@v5
-        with:
-          path: templates
+      - name: Checkout this repo
+        run: |
+          git clone --depth 1 --single-branch -b main "https://github.com/${{ github.repository }}.git" extra
+          cd extra
+          if [ -n "${{ github.event.before }}" ] && [ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]; then
+            git fetch --no-tags origin "${{ github.event.before }}" --depth 1 || true
+          fi
+          git fetch --no-tags origin "${{ github.sha }}" --depth 1
+          git checkout --detach "${{ github.sha }}"
+
+      - name: Determine changed templates
+        id: changed
+        run: |
+          cd extra
+          base="${{ github.event.before }}"
+          tip="${{ github.sha }}"
+          if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ]; then
+            changed_pkgs=$(find srcpkgs -maxdepth 1 -mindepth 1 -type d -printf "%f\n" | tr '\n' ' ')
+            removed_pkgs=""
+          else
+            changed_pkgs=$(git diff --name-only "$base" "$tip" --diff-filter=AM -- 'srcpkgs/*/template' | cut -d/ -f2 | sort -u | tr '\n' ' ')
+            removed_pkgs=$(git diff --name-status "$base" "$tip" -- 'srcpkgs/*/template' | awk '$1=="D"{print $2}' | cut -d/ -f2 | sort -u | tr '\n' ' ')
+          fi
+          changed_pkgs="${changed_pkgs%% }"
+          removed_pkgs="${removed_pkgs%% }"
+          echo "Changed templates: ${changed_pkgs:-<none>}"
+          echo "Removed templates: ${removed_pkgs:-<none>}"
+          echo "pkgs=$changed_pkgs" >> "$GITHUB_OUTPUT"
+          echo "removed=$removed_pkgs" >> "$GITHUB_OUTPUT"
 
       - name: Checkout void-packages
-        uses: actions/checkout@v5
-        with:
-          repository: void-linux/void-packages
-          path: void-packages
-
-      - name: Copy custom templates
         run: |
-          cp -rv templates/srcpkgs/* void-packages/srcpkgs/
+          git clone --depth 1 https://github.com/void-linux/void-packages.git void-packages
+          cd void-packages
+          git checkout --detach master
 
-      - name: Apply shlibs modifications
+      - name: Merge templates and edit shlibs
         run: |
+          echo "==> copying templates..."
+          cp -rv extra/srcpkgs/* void-packages/srcpkgs/
+
           SHLIBS_FILE="void-packages/common/shlibs"
-          APPEND_FILE="shlibs_append"
+          APPEND_FILE="extra/shlibs_append"
+          REMOVE_FILE="extra/shlibs_remove"
+
+          echo "==> updating common/shlibs..."
+          if [ -f "$REMOVE_FILE" ]; then
+            while IFS= read -r line; do
+              [ -z "$line" ] && continue
+              grep -vF "$line" "$SHLIBS_FILE" > "$SHLIBS_FILE.tmp" && mv "$SHLIBS_FILE.tmp" "$SHLIBS_FILE"
+              echo "   - removed: $line"
+            done < "$REMOVE_FILE"
+          fi
+
           if [ -f "$APPEND_FILE" ]; then
             while IFS= read -r line; do
               [ -z "$line" ] && continue
@@ -54,44 +95,79 @@ jobs:
             done < "$APPEND_FILE"
           fi
 
-      - name: Prepare masterdir and bootstrap
-        working-directory: void-packages
+      - name: Prepare masterdir
         run: |
+          cd void-packages
           chown -R builder:builder .
           sudo -Eu builder common/travis/set_mirror.sh
           sudo -Eu builder common/travis/prepare.sh
           common/travis/fetch-xtools.sh
 
-      - name: Build libcallaudio first
-        working-directory: void-packages
-        env:
-          ARCH: ${{ matrix.arch }}
+      - name: Build changed packages
+        id: build_step
         run: |
           export PATH="/opt/xbps/usr/bin/:$PATH"
-          sudo -Eu builder ./xbps-src -a $ARCH -j"$(nproc)" pkg libcallaudio
+          cd void-packages
 
-      - name: Build remaining packages
-        working-directory: void-packages
-        env:
-          ARCH: ${{ matrix.arch }}
-        run: |
-          export PATH="/opt/xbps/usr/bin/:$PATH"
-          for pkg in $(ls ../templates/srcpkgs | grep -v libcallaudio); do
-            sudo -Eu builder ./xbps-src -a $ARCH -j"$(nproc)" pkg $pkg
+          changed="${{ steps.changed.outputs.pkgs }}"
+          removed="${{ steps.changed.outputs.removed }}"
+
+          if [ -z "$changed" ]; then
+            echo "No changed templates, skipping build."
+            echo "built=" >> "$GITHUB_OUTPUT"
+            echo "failed=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [ "$BOOTSTRAP" != "$ARCH" ]; then
+            arch="-a $ARCH"
+          fi
+
+          if [ "$TEST" = 1 ]; then
+            test="-Q"
+          else
+            test=""
+          fi
+
+          PKGS=$(sudo -Eu builder ./xbps-src $test sort-dependencies $changed)
+          built=""
+          failed=""
+
+          for pkg in ${PKGS}; do
+            if sudo -Eu builder ./xbps-src -j"$(nproc)" -s $arch $test pkg "${pkg}"; then
+              built="$built $pkg"
+            else
+              echo "!! build failed for ${pkg}"
+              failed="$failed $pkg"
+            fi
           done
+
+          built="${built%% }"
+          failed="${failed%% }"
+
+          echo "Built packages: ${built:-<none>}"
+          echo "Failed packages: ${failed:-<none>}"
+
+          echo "built=$built" >> "$GITHUB_OUTPUT"
+          echo "failed=$failed" >> "$GITHUB_OUTPUT"
+
+          if [ -n "$failed" ]; then
+            echo "Some packages failed to build. Exiting with error."
+            exit 1
+          fi
 
       - name: Index repository
         working-directory: void-packages
         run: |
           xbps-rindex -a hostdir/binpkgs/*.xbps
 
-      - name: Deploy to repository branch
+      - name: Deploy to GitHub branch
         working-directory: void-packages
         run: |
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
-          git checkout --orphan repository-${{ matrix.arch }}-glibc
+          git checkout --orphan repository-${{ env.ARCH }}-glibc
           cp -r hostdir/binpkgs/* .
           git add .
-          git commit -m "Update repository for ${{ matrix.arch }}"
-          git push --force origin repository-${{ matrix.arch }}-glibc
+          git commit -m "Update repository for ${{ env.ARCH }}"
+          git push --force origin repository-${{ env.ARCH }}-glibc
