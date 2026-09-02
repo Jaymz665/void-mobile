@@ -1,5 +1,6 @@
 libXISF.so.0 libxisf-0.2.9_1
 libfwupd.so.3 fwupd-2.0.16_1
+libgmobile.so.0 gmobile-0.6.0_1
 libgpac.so.16 libgpac-26.02.0_1
 libcmark-gfm.so.0 cmark-gfm-0.29.0.gfm.13_1
 libcmark-gfm-extensions.so.0 cmark-gfm-0.29.0.gfm.13_1
@@ -11,7 +12,6 @@ libglycin-gtk4-2.so.0 glycin-gtk4-2.0.7_1
 libresvg.so.0.46 libresvg0-0.46.0_1
 libgpiod.so.3 libgpiod-2.2_4
 libgpiodcxx.so.2 libgpiod-2.2_4
-libgmobile.so.0 gmobile-0.6.0_1
 libfeedback-0.0.so.0 feedbackd-0.8.9_1
 libcallaudio-0.1.so.0 callaudiod-0.1.99_1
 libcellbroadcast-0.0.so.0 cellbroadcastd-libs-0.0.3_1
