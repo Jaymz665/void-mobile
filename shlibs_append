@@ -13,7 +13,7 @@ libresvg.so.0.46 libresvg0-0.46.0_1
 libgpiod.so.3 libgpiod-2.2_4
 libgpiodcxx.so.2 libgpiod-2.2_4
 libfeedback-0.0.so.0 feedbackd-0.8.9_1
-libcallaudio-0.1.so.0 callaudiod-0.1.99_1
+libcallaudio-0.1.so.0 libcallaudio-0.1.99_1
 libcellbroadcast-0.0.so.0 cellbroadcastd-libs-0.0.3_1
 libdng.so.1 libdng-0.2.2_1
 libmegapixels.so.1 libmegapixels-0.2.3_1
