@@ -11,16 +11,13 @@ on:
   workflow_dispatch:
     inputs:
       forced_package:
-        description: 'Имя пакета для принудительной сборки (необязательно)'
+        description: 'Имя пакета для принудительной сборки'
         required: false
         type: string
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    container:
-      image: ghcr.io/void-linux/void-glibc-full:20250616R1
-      options: --privileged
 
     steps:
       - name: Checkout repository
@@ -28,81 +25,50 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Update XBPS and system
+      - name: Build inside Void Linux Docker
         run: |
-          xbps-install -Syu xbps
-          xbps-install -yu
-          xbps-install -y sudo bash git rsync coreutils
+          docker run --privileged --rm \
+            -v ${{ github.workspace }}:/void-packages \
+            -w /void-packages \
+            -e GITHUB_BASE_REF="${{ github.base_ref }}" \
+            -e FORCED_PACKAGE="${{ github.event.inputs.forced_package }}" \
+            ghcr.io/void-linux/void-glibc-full:20250616R1 \
+            bash -c "
+              set -e
+              export PATH=\"/opt/xbps/usr/bin:\$PATH\"
 
-      - name: Detect changed packages
-        id: detect
-        run: |
-          export PATH="/opt/xbps/usr/bin/:$PATH"
+              echo '==> Обновление XBPS...'
+              xbps-install -Syu xbps
+              xbps-install -yu
+              xbps-install -y sudo bash git rsync coreutils
 
-          # Если имя пакета передано вручную при запуске workflow
-          if [ -n "${{ github.event.inputs.forced_package }}" ]; then
-            echo "::notice::Запущена принудительная сборка для пакета: ${{ github.event.inputs.forced_package }}"
-            echo "pkgs=${{ github.event.inputs.forced_package }}" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
+              # Определение пакета для сборки
+              if [ -n \"\$FORCED_PACKAGE\" ]; then
+                PKGS=\"\$FORCED_PACKAGE\"
+              else
+                BASE_SHA=\"origin/\${GITHUB_BASE_REF:-main}\"
+                # Загружаем git историю внутри контейнера
+                git config --global --add safe.directory /void-packages
+                PKGS=\$(git diff --name-only \"\$BASE_SHA\"...HEAD 2>/dev/null | grep '^srcpkgs/' | cut -d/ -f2 | sort -u | tr '\n' ' ')
+              fi
 
-          # Определяем базовый коммит для сравнения
-          if [ -n "$GITHUB_BASE_REF" ]; then
-            BASE_SHA="origin/$GITHUB_BASE_REF"
-          else
-            BASE_SHA="HEAD~1"
-          fi
+              if [ -z \"\$PKGS\" ]; then
+                echo '::notice::Изменённых шаблонов не найдено, пропускаем сборку.'
+                exit 0
+              fi
 
-          echo "Сравниваем с: $BASE_SHA"
+              echo \"==> Найдено для сборки: \$PKGS\"
 
-          # Ищем изменения только в файлах srcpkgs/<package>/template
-          CHANGED=$(git diff --name-only "$BASE_SHA"...HEAD | grep '^srcpkgs/' | cut -d/ -f2 | sort -u | tr '\n' ' ')
+              # Настройка пользователя builder
+              useradd -m builder || true
+              chown -R builder:builder /void-packages
 
-          if [ -z "$CHANGED" ]; then
-            echo "Изменённых шаблонов не найдено."
-            echo "pkgs=" >> "$GITHUB_OUTPUT"
-          else
-            echo "Найдены пакеты для сборки: $CHANGED"
-            echo "pkgs=$CHANGED" >> "$GITHUB_OUTPUT"
-          fi
+              # Сборка под aarch64
+              sudo -Eu builder ./xbps-src binary-bootstrap
+              SORTED_PKGS=\$(sudo -Eu builder ./xbps-src sort-dependencies \$PKGS)
 
-      - name: Build packages with xbps-src
-        if: steps.detect.outputs.pkgs != ''
-        env:
-          ARCH: aarch64
-          BOOTSTRAP: x86_64
-        run: |
-          export PATH="/opt/xbps/usr/bin/:$PATH"
-
-          # Настройка пользователя для работы xbps-src
-          useradd -m builder || true
-          chown -R builder:builder .
-
-          PKGS="${{ steps.detect.outputs.pkgs }}"
-          echo "Запуск сборки для: $PKGS"
-
-          # Инициализация chroot окружения
-          sudo -Eu builder ./xbps-src binary-bootstrap
-
-          # Сортировка зависимостей и сборка
-          SORTED_PKGS=$(sudo -Eu builder ./xbps-src sort-dependencies $PKGS)
-
-          failed=""
-          for pkg in ${SORTED_PKGS}; do
-            arch=""
-            if [ "$BOOTSTRAP" != "$ARCH" ]; then
-              arch="-a $ARCH"
-            fi
-
-            if sudo -Eu builder ./xbps-src -j"$(nproc)" $arch pkg "${pkg}"; then
-              echo "Успешно собран: ${pkg}"
-            else
-              echo "!! Ошибка сборки пакета: ${pkg}"
-              failed="$failed $pkg"
-            fi
-          done
-
-          if [ -n "$failed" ]; then
-            echo "Следующие пакеты не удалось собрать: $failed"
-            exit 1
-          fi
+              for pkg in \$SORTED_PKGS; do
+                echo \"==> Собираем пакет: \$pkg (aarch64)\"
+                sudo -Eu builder ./xbps-src -j\$(nproc) -a aarch64 pkg \"\$pkg\"
+              done
+            "
