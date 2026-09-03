@@ -4,74 +4,61 @@ on:
   push:
     branches:
       - '**'
-  pull_request:
-    branches:
-      - main
-      - master
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
-    container:
-      image: ghcr.io/void-linux/void-glibc-full:20250616R1
-      options: --privileged
-
     steps:
-      - name: Install runner dependencies
-        run: |
-          xbps-install -Syu xbps
-          xbps-install -yu
-          xbps-install -y libstdc++ bash git sudo rsync coreutils
-
       - name: Checkout custom repository
         uses: actions/checkout@v4
         with:
           path: custom-pkgs
 
-      - name: Clone void-packages
+      - name: Install XBPS on Ubuntu Host
+        run: |
+          sudo apt-get update && sudo apt-get install -y git wget
+
+          # Скачиваем статическую сборку xbps
+          wget https://repo-default.voidlinux.org/static/xbps-static-latest.x86_64-musl.tar.xz
+          mkdir -p /tmp/xbps
+          tar -xf xbps-static-latest.x86_64-musl.tar.xz -C /tmp/xbps
+
+          # Добавляем xbps в PATH
+          echo "/tmp/xbps/usr/bin" >> $GITHUB_PATH
+
+      - name: Clone void-packages & Prepare
         run: |
           git clone --depth=1 https://github.com/void-linux/void-packages.git void-packages
 
-          # Копируем ваши кастомные шаблоны в void-packages/srcpkgs
           if [ -d "custom-pkgs/srcpkgs" ]; then
             cp -a custom-pkgs/srcpkgs/* void-packages/srcpkgs/
           fi
-
-          # Настраиваем права для builder
-          git config --global --add safe.directory "$GITHUB_WORKSPACE/void-packages"
-          useradd -m builder || true
-          chown -R builder:builder "$GITHUB_WORKSPACE/void-packages"
-
-          # Отключаем использование namespaces (unshare) в конфиге xbps-src
-          echo 'XBPS_ALLOW_CHROOT_BREAKOUT=yes' >> void-packages/etc/conf
 
       - name: Build all packages
         env:
           ARCH: aarch64
         run: |
-          export PATH="/opt/xbps/usr/bin:$PATH"
-          cd "$GITHUB_WORKSPACE/void-packages"
+          cd void-packages
 
-          # Находим ТОЛЬКО директории внутри custom-pkgs/srcpkgs
           PKGS=$(find "$GITHUB_WORKSPACE/custom-pkgs/srcpkgs" -mindepth 1 -maxdepth 1 -type d -exec basename {} \;)
 
           if [ -z "$PKGS" ]; then
-            echo "В custom-pkgs/srcpkgs не найдено папок с пакетами."
+            echo "Пакеты не найдены."
             exit 0
           fi
 
           echo "Найдены пакеты для сборки: $PKGS"
 
-          # Флаг -N отключает использование unshare/user namespaces
-          sudo -Eu builder ./xbps-src -N binary-bootstrap
+          # Инициализируем chroot прямо на хосте
+          ./xbps-src binary-bootstrap
 
           # Сортируем с учётом зависимостей
-          SORTED_PKGS=$(sudo -Eu builder ./xbps-src -N sort-dependencies $PKGS)
+          SORTED_PKGS=$(./xbps-src sort-dependencies $PKGS)
 
           for pkg in $SORTED_PKGS; do
             echo "::group::Сборка $pkg ($ARCH)"
-            sudo -Eu builder ./xbps-src -N -j$(nproc) -a "$ARCH" pkg "$pkg"
+            ./xbps-src -j$(nproc) -a "$ARCH" pkg "$pkg"
             echo "::endgroup::"
           done
