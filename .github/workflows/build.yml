@@ -44,6 +44,9 @@ jobs:
           useradd -m builder || true
           chown -R builder:builder "$GITHUB_WORKSPACE/void-packages"
 
+          # Отключаем использование namespaces (unshare) в конфиге xbps-src
+          echo 'XBPS_ALLOW_CHROOT_BREAKOUT=yes' >> void-packages/etc/conf
+
       - name: Build all packages
         env:
           ARCH: aarch64
@@ -51,7 +54,7 @@ jobs:
           export PATH="/opt/xbps/usr/bin:$PATH"
           cd "$GITHUB_WORKSPACE/void-packages"
 
-          # Находим ТОЛЬКО директории внутри custom-pkgs/srcpkgs (игнорируя .patch и обычные файлы)
+          # Находим ТОЛЬКО директории внутри custom-pkgs/srcpkgs
           PKGS=$(find "$GITHUB_WORKSPACE/custom-pkgs/srcpkgs" -mindepth 1 -maxdepth 1 -type d -exec basename {} \;)
 
           if [ -z "$PKGS" ]; then
@@ -61,14 +64,14 @@ jobs:
 
           echo "Найдены пакеты для сборки: $PKGS"
 
-          # Инициализируем chroot
-          sudo -Eu builder ./xbps-src binary-bootstrap
+          # Флаг -N отключает использование unshare/user namespaces
+          sudo -Eu builder ./xbps-src -N binary-bootstrap
 
           # Сортируем с учётом зависимостей
-          SORTED_PKGS=$(sudo -Eu builder ./xbps-src sort-dependencies $PKGS)
+          SORTED_PKGS=$(sudo -Eu builder ./xbps-src -N sort-dependencies $PKGS)
 
           for pkg in $SORTED_PKGS; do
             echo "::group::Сборка $pkg ($ARCH)"
-            sudo -Eu builder ./xbps-src -j$(nproc) -a "$ARCH" pkg "$pkg"
+            sudo -Eu builder ./xbps-src -N -j$(nproc) -a "$ARCH" pkg "$pkg"
             echo "::endgroup::"
           done
