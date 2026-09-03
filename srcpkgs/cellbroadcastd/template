@@ -1,0 +1,57 @@
+# Template file for 'cellbroadcastd'
+pkgname=cellbroadcastd
+version=0.0.3
+revision=10
+wrksrc="${pkgname}-${version}"
+build_style=meson
+configure_args="
+    -Dtests=false
+    -Dintrospection=disabled"
+hostmakedepends="
+    meson
+    pkg-config
+    gobject-introspection
+    vala
+    glib-devel
+    gettext
+"
+makedepends="
+    gmobile-devel
+    json-glib-devel
+    libgirepository-devel
+    mobile-broadband-provider-info
+    ModemManager-devel
+"
+depends=""
+short_desc="Manages cell broadcast messages received via ModemManager"
+maintainer="Jaymz <your-email@example.com>"
+license="LGPL-2.1-or-later"
+homepage="https://gitlab.freedesktop.org/devrtz/cellbroadcastd"
+distfiles="https://sources.phosh.mobi/releases/cellbroadcastd/cellbroadcastd-${version}.tar.xz"
+checksum=686d44cd02e23efaade0d28ea3f34d96562d856db6776fd0af4dbc0fe3a30392
+archs="aarch64"
+
+# Если pkg-config не видит gmobile, покажи где он
+pre_configure() {
+    echo "Looking for gmobile.pc..."
+    find ${XBPS_CROSS_BASE} -name "gmobile.pc" 2>/dev/null || true
+    pkg-config --modversion gmobile || echo "gmobile.pc not found by pkg-config"
+}
+
+cellbroadcastd-libs_package() {
+    short_desc+=" - shared libraries"
+    pkg_install() {
+        vmove "usr/lib/*.so.*"
+    }
+}
+
+cellbroadcastd-devel_package() {
+    short_desc+=" - development files"
+    depends="${sourcepkg}-libs-${version}_${revision}"
+    pkg_install() {
+        vmove usr/include
+        vmove "usr/lib/*.a" 2>/dev/null || true
+        vmove "usr/lib/*.so"
+        vmove usr/lib/pkgconfig
+    }
+}
