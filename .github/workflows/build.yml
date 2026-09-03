@@ -4,8 +4,10 @@ on:
     push:
         branches:
             - main
+            - master
         paths:
             - "srcpkgs/**"
+            - ".github/workflows/**"
     workflow_dispatch:
 
 jobs:
@@ -51,9 +53,8 @@ jobs:
 
             - name: Checkout this repo
               run: |
-                  git clone --depth 1 --single-branch -b main "https://github.com/${{ github.repository }}.git" extra
+                  git clone --depth 1 --single-branch "https://github.com/${{ github.repository }}.git" extra
                   cd extra
-                  # we need the previous revision to diff against
                   if [ -n "${{ github.event.before }}" ] && [ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]; then
                       git fetch --no-tags origin "${{ github.event.before }}" --depth 1 || true
                   fi
@@ -103,7 +104,9 @@ jobs:
             - name: Merge templates and edit shlibs
               run: |
                   echo "==> copying templates..."
-                  cp -rv extra/srcpkgs/* void-packages/srcpkgs/
+                  if [ -d "extra/srcpkgs" ]; then
+                      cp -rv extra/srcpkgs/* void-packages/srcpkgs/
+                  fi
 
                   SHLIBS_FILE="void-packages/common/shlibs"
                   APPEND_FILE="extra/shlibs_append"
