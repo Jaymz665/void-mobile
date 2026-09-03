@@ -45,19 +45,20 @@ jobs:
           cd extra
           base="${{ github.event.before }}"
           tip="${{ github.sha }}"
-          if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ]; then
+
+          # Если это ручной запуск или первый пуш, собираем ВСЕ шаблоны
+          if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             changed_pkgs=$(find srcpkgs -maxdepth 1 -mindepth 1 -type d -printf "%f\n" | tr '\n' ' ')
             removed_pkgs=""
           else
             changed_pkgs=$(git diff --name-only "$base" "$tip" --diff-filter=AM -- 'srcpkgs/*/template' | cut -d/ -f2 | sort -u | tr '\n' ' ')
             removed_pkgs=$(git diff --name-status "$base" "$tip" -- 'srcpkgs/*/template' | awk '$1=="D"{print $2}' | cut -d/ -f2 | sort -u | tr '\n' ' ')
           fi
+
           changed_pkgs="${changed_pkgs%% }"
           removed_pkgs="${removed_pkgs%% }"
           echo "Changed templates: ${changed_pkgs:-<none>}"
-          echo "Removed templates: ${removed_pkgs:-<none>}"
           echo "pkgs=$changed_pkgs" >> "$GITHUB_OUTPUT"
-          echo "removed=$removed_pkgs" >> "$GITHUB_OUTPUT"
 
       - name: Checkout void-packages
         run: |
@@ -74,12 +75,10 @@ jobs:
           APPEND_FILE="extra/shlibs_append"
           REMOVE_FILE="extra/shlibs_remove"
 
-          echo "==> updating common/shlibs..."
           if [ -f "$REMOVE_FILE" ]; then
             while IFS= read -r line; do
               [ -z "$line" ] && continue
               grep -vF "$line" "$SHLIBS_FILE" > "$SHLIBS_FILE.tmp" && mv "$SHLIBS_FILE.tmp" "$SHLIBS_FILE"
-              echo "   - removed: $line"
             done < "$REMOVE_FILE"
           fi
 
@@ -88,7 +87,6 @@ jobs:
               [ -z "$line" ] && continue
               if ! grep -qF "$line" "$SHLIBS_FILE"; then
                 echo "$line" >> "$SHLIBS_FILE"
-                echo "   + added: $line"
               fi
             done < "$APPEND_FILE"
           fi
@@ -96,9 +94,7 @@ jobs:
       - name: Prepare masterdir
         run: |
           cd void-packages
-          # fetch-xtools выполняется от root, как в репозитории-примере
           common/travis/fetch-xtools.sh
-          # права отдаются builder только перед вызовом скриптов travis
           chown -R builder:builder .
           sudo -Eu builder common/travis/set_mirror.sh
           sudo -Eu builder common/travis/prepare.sh
@@ -112,6 +108,7 @@ jobs:
           changed="${{ steps.changed.outputs.pkgs }}"
           if [ -z "$changed" ]; then
             echo "No changed templates, skipping build."
+            echo "has_pkgs=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
@@ -132,30 +129,32 @@ jobs:
             fi
           done
 
-          built="${built%% }"
-          failed="${failed%% }"
-
-          echo "Built packages: ${built:-<none>}"
-          echo "Failed packages: ${failed:-<none>}"
-
           if [ -n "$failed" ]; then
-            echo "Some packages failed to build."
+            echo "Some packages failed to build: $failed"
             exit 1
           fi
 
+          echo "has_pkgs=true" >> "$GITHUB_OUTPUT"
+
       - name: Index repository
+        if: ${{ steps.build_step.outputs.has_pkgs == 'true' }}
         working-directory: void-packages
         run: |
           xbps-rindex -a hostdir/binpkgs/*.xbps
 
       - name: Deploy to GitHub branch
+        if: ${{ steps.build_step.outputs.has_pkgs == 'true' }}
         working-directory: extra
         run: |
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
           git branch -D repository-${{ env.ARCH }}-glibc 2>/dev/null || true
           git checkout --orphan repository-${{ env.ARCH }}-glibc
-          cp -r ../void-packages/hostdir/binpkgs/* .
+
+          # Копируем только если бинарники существуют
+          mkdir -p ../void-packages/hostdir/binpkgs
+          cp -r ../void-packages/hostdir/binpkgs/* . 2>/dev/null || true
+
           git add .
           if git diff --staged --quiet; then
             echo "No changes to commit, skipping push"
