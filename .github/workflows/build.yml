@@ -1,166 +1,108 @@
-name: Build packages (aarch64)
+name: Build Void Packages
 
 on:
   push:
-    branches: [ main ]
+    branches:
+      - '**'
+  pull_request:
+    branches:
+      - main
+      - master
   workflow_dispatch:
+    inputs:
+      forced_package:
+        description: 'Имя пакета для принудительной сборки (необязательно)'
+        required: false
+        type: string
 
 jobs:
   build:
-    name: Build packages (aarch64)
     runs-on: ubuntu-latest
     container:
       image: ghcr.io/void-linux/void-glibc-full:20250616R1
       options: --privileged
-      volumes:
-        - /dev:/dev
-    env:
-      ARCH: aarch64
-      BOOTSTRAP: x86_64
-      TEST: 0
-    permissions:
-      contents: write
 
     steps:
-      - name: Prepare container
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Update XBPS and system
         run: |
-          mkdir -p /etc/xbps.d && cp /usr/share/xbps.d/*-repository-*.conf /etc/xbps.d/
-          sed -i 's|repo-default|repo-ci|g' /etc/xbps.d/*-repository-*.conf
           xbps-install -Syu xbps
           xbps-install -yu
-          xbps-install -y sudo bash curl git rsync
-          useradd -G xbuilder -M builder
+          xbps-install -y sudo bash git rsync coreutils
 
-      - name: Checkout this repo
-        run: |
-          git clone --depth 1 --single-branch -b main "https://github.com/${{ github.repository }}.git" extra
-          cd extra
-          if [ -n "${{ github.event.before }}" ] && [ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]; then
-            git fetch --no-tags origin "${{ github.event.before }}" --depth 1 || true
-          fi
-          git fetch --no-tags origin "${{ github.sha }}" --depth 1
-          git checkout --detach "${{ github.sha }}"
-
-      - name: Determine changed templates
-        id: changed
-        run: |
-          cd extra
-          base="${{ github.event.before }}"
-          tip="${{ github.sha }}"
-
-          # Если это ручной запуск или первый пуш, собираем ВСЕ шаблоны
-          if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            changed_pkgs=$(find srcpkgs -maxdepth 1 -mindepth 1 -type d -printf "%f\n" | tr '\n' ' ')
-            removed_pkgs=""
-          else
-            changed_pkgs=$(git diff --name-only "$base" "$tip" --diff-filter=AM -- 'srcpkgs/*/template' | cut -d/ -f2 | sort -u | tr '\n' ' ')
-            removed_pkgs=$(git diff --name-status "$base" "$tip" -- 'srcpkgs/*/template' | awk '$1=="D"{print $2}' | cut -d/ -f2 | sort -u | tr '\n' ' ')
-          fi
-
-          changed_pkgs="${changed_pkgs%% }"
-          removed_pkgs="${removed_pkgs%% }"
-          echo "Changed templates: ${changed_pkgs:-<none>}"
-          echo "pkgs=$changed_pkgs" >> "$GITHUB_OUTPUT"
-
-      - name: Checkout void-packages
-        run: |
-          git clone --depth 1 https://github.com/void-linux/void-packages.git void-packages
-          cd void-packages
-          git checkout --detach master
-
-      - name: Merge templates and edit shlibs
-        run: |
-          echo "==> copying templates..."
-          cp -rv extra/srcpkgs/* void-packages/srcpkgs/
-
-          SHLIBS_FILE="void-packages/common/shlibs"
-          APPEND_FILE="extra/shlibs_append"
-          REMOVE_FILE="extra/shlibs_remove"
-
-          if [ -f "$REMOVE_FILE" ]; then
-            while IFS= read -r line; do
-              [ -z "$line" ] && continue
-              grep -vF "$line" "$SHLIBS_FILE" > "$SHLIBS_FILE.tmp" && mv "$SHLIBS_FILE.tmp" "$SHLIBS_FILE"
-            done < "$REMOVE_FILE"
-          fi
-
-          if [ -f "$APPEND_FILE" ]; then
-            while IFS= read -r line; do
-              [ -z "$line" ] && continue
-              if ! grep -qF "$line" "$SHLIBS_FILE"; then
-                echo "$line" >> "$SHLIBS_FILE"
-              fi
-            done < "$APPEND_FILE"
-          fi
-
-      - name: Prepare masterdir
-        run: |
-          cd void-packages
-          common/travis/fetch-xtools.sh
-          chown -R builder:builder .
-          sudo -Eu builder common/travis/set_mirror.sh
-          sudo -Eu builder common/travis/prepare.sh
-
-      - name: Build changed packages
-        id: build_step
+      - name: Detect changed packages
+        id: detect
         run: |
           export PATH="/opt/xbps/usr/bin/:$PATH"
-          cd void-packages
 
-          changed="${{ steps.changed.outputs.pkgs }}"
-          if [ -z "$changed" ]; then
-            echo "No changed templates, skipping build."
-            echo "has_pkgs=false" >> "$GITHUB_OUTPUT"
+          # Если имя пакета передано вручную при запуске workflow
+          if [ -n "${{ github.event.inputs.forced_package }}" ]; then
+            echo "::notice::Запущена принудительная сборка для пакета: ${{ github.event.inputs.forced_package }}"
+            echo "pkgs=${{ github.event.inputs.forced_package }}" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
-          if [ "$BOOTSTRAP" != "$ARCH" ]; then
-            arch="-a $ARCH"
+          # Определяем базовый коммит для сравнения
+          if [ -n "$GITHUB_BASE_REF" ]; then
+            BASE_SHA="origin/$GITHUB_BASE_REF"
+          else
+            BASE_SHA="HEAD~1"
           fi
 
-          PKGS=$(sudo -Eu builder ./xbps-src sort-dependencies $changed)
-          built=""
-          failed=""
+          echo "Сравниваем с: $BASE_SHA"
 
-          for pkg in ${PKGS}; do
-            if sudo -Eu builder ./xbps-src -j"$(nproc)" -s $arch pkg "${pkg}"; then
-              built="$built $pkg"
+          # Ищем изменения только в файлах srcpkgs/<package>/template
+          CHANGED=$(git diff --name-only "$BASE_SHA"...HEAD | grep '^srcpkgs/' | cut -d/ -f2 | sort -u | tr '\n' ' ')
+
+          if [ -z "$CHANGED" ]; then
+            echo "Изменённых шаблонов не найдено."
+            echo "pkgs=" >> "$GITHUB_OUTPUT"
+          else
+            echo "Найдены пакеты для сборки: $CHANGED"
+            echo "pkgs=$CHANGED" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build packages with xbps-src
+        if: steps.detect.outputs.pkgs != ''
+        env:
+          ARCH: aarch64
+          BOOTSTRAP: x86_64
+        run: |
+          export PATH="/opt/xbps/usr/bin/:$PATH"
+
+          # Настройка пользователя для работы xbps-src
+          useradd -m builder || true
+          chown -R builder:builder .
+
+          PKGS="${{ steps.detect.outputs.pkgs }}"
+          echo "Запуск сборки для: $PKGS"
+
+          # Инициализация chroot окружения
+          sudo -Eu builder ./xbps-src binary-bootstrap
+
+          # Сортировка зависимостей и сборка
+          SORTED_PKGS=$(sudo -Eu builder ./xbps-src sort-dependencies $PKGS)
+
+          failed=""
+          for pkg in ${SORTED_PKGS}; do
+            arch=""
+            if [ "$BOOTSTRAP" != "$ARCH" ]; then
+              arch="-a $ARCH"
+            fi
+
+            if sudo -Eu builder ./xbps-src -j"$(nproc)" $arch pkg "${pkg}"; then
+              echo "Успешно собран: ${pkg}"
             else
-              echo "!! build failed for ${pkg}"
+              echo "!! Ошибка сборки пакета: ${pkg}"
               failed="$failed $pkg"
             fi
           done
 
           if [ -n "$failed" ]; then
-            echo "Some packages failed to build: $failed"
+            echo "Следующие пакеты не удалось собрать: $failed"
             exit 1
-          fi
-
-          echo "has_pkgs=true" >> "$GITHUB_OUTPUT"
-
-      - name: Index repository
-        if: ${{ steps.build_step.outputs.has_pkgs == 'true' }}
-        working-directory: void-packages
-        run: |
-          xbps-rindex -a hostdir/binpkgs/*.xbps
-
-      - name: Deploy to GitHub branch
-        if: ${{ steps.build_step.outputs.has_pkgs == 'true' }}
-        working-directory: extra
-        run: |
-          git config user.name "GitHub Actions"
-          git config user.email "actions@github.com"
-          git branch -D repository-${{ env.ARCH }}-glibc 2>/dev/null || true
-          git checkout --orphan repository-${{ env.ARCH }}-glibc
-
-          # Копируем только если бинарники существуют
-          mkdir -p ../void-packages/hostdir/binpkgs
-          cp -r ../void-packages/hostdir/binpkgs/* . 2>/dev/null || true
-
-          git add .
-          if git diff --staged --quiet; then
-            echo "No changes to commit, skipping push"
-          else
-            git commit -m "Update repository for ${{ env.ARCH }}"
-            git push --force origin repository-${{ env.ARCH }}-glibc
           fi
