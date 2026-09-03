@@ -1,78 +1,24 @@
-name: Build Void Packages
-
-on:
-  push:
-    branches:
-      - '**'
-  pull_request:
-    branches:
-      - main
-      - master
-  workflow_dispatch:
-
-jobs:
-  build:
-    runs-on: ubuntu-latest
-
-    # Запускаем сборку прямо в контейнере Void Linux
-    container:
-      image: ghcr.io/void-linux/void-glibc-full:20250616R1
-      options: --privileged
-
-    steps:
-      # 1. Устанавливаем минимально необходимые зависимости для работы самого GitHub Runner (включая libstdc++ для Node.js)
-      - name: Install runner dependencies
-        run: |
-          xbps-install -Syu xbps
-          xbps-install -yu
-          xbps-install -y libstdc++ bash git sudo rsync coreutils
-
-      # 2. Скачиваем код (теперь Node.js запустится без ошибок, так как libstdc++ установлена)
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      # 3. Настраиваем безопасные директории Git и пользователя builder
-      - name: Prepare build environment
-        run: |
-          git config --global --add safe.directory "$GITHUB_WORKSPACE"
-          useradd -m builder || true
-          chown -R builder:builder "$GITHUB_WORKSPACE"
-
-      # 4. Вычисляем изменённые шаблоны и собираем их
-      - name: Build changed packages
+- name: Build all packages in srcpkgs
         env:
           ARCH: aarch64
-          BOOTSTRAP: x86_64
         run: |
           export PATH="/opt/xbps/usr/bin:$PATH"
 
-          # Если мы в ветке main/master, сравниваем с предыдущим коммитом (HEAD~1)
-          CURRENT_BRANCH="$(git rev-parse --abbrev-ref HEAD)"
-          if [ "$CURRENT_BRANCH" = "main" ] || [ "$CURRENT_BRANCH" = "master" ]; then
-            BASE_REF="HEAD~1"
-          else
-            BASE_REF="${GITHUB_BASE_REF:-origin/main}"
-          fi
+          # Получаем список всех папок из srcpkgs
+          PKGS=$(ls -1 srcpkgs | tr '\n' ' ')
 
-          echo "Сравниваем текущую ветку с $BASE_REF..."
-
-          # Находим изменённые файлы шаблонов
-          CHANGED=$(git diff --name-only "$BASE_REF"...HEAD 2>/dev/null | grep '^srcpkgs/' | cut -d/ -f2 | sort -u | tr '\n' ' ')
-
-          if [ -z "$CHANGED" ]; then
-            echo "Изменённых пакетов не найдено в diff. Пропускаем сборку."
+          if [ -z "$PKGS" ]; then
+            echo "Папка srcpkgs пуста."
             exit 0
           fi
 
-          echo "Найдены пакеты для сборки: $CHANGED"
+          echo "Найдены пакеты для сборки: $PKGS"
 
           # Инициализируем chroot
           sudo -Eu builder ./xbps-src binary-bootstrap
 
-          # Сортируем и собираем
-          SORTED_PKGS=$(sudo -Eu builder ./xbps-src sort-dependencies $CHANGED)
+          # Сортируем с учётом зависимостей и собираем
+          SORTED_PKGS=$(sudo -Eu builder ./xbps-src sort-dependencies $PKGS)
 
           for pkg in $SORTED_PKGS; do
             echo "::group::Сборка $pkg ($ARCH)"
