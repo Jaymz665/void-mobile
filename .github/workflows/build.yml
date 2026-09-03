@@ -282,7 +282,7 @@ jobs:
                       echo "SSH_PRIV secret is missing, skipping deploy."
                       exit 0
                   fi
-                  set -eu1
+                  set -eu
 
                   sudo -Eu builder ssh \
                       -p "$SSH_MIRROR_PORT" \
