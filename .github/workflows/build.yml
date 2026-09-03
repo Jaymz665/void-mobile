@@ -69,7 +69,8 @@ jobs:
                   base="${{ github.event.before }}"
                   tip="${{ github.sha }}"
 
-                  if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ]; then
+                  # Если запуск ручной (workflow_dispatch) или первый коммит — собираем ВСЕ пакеты в srcpkgs/
+                  if [ "${{ github.event_name }}" = "workflow_dispatch" ] || [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ]; then
                       changed_pkgs=$(find srcpkgs -maxdepth 1 -mindepth 1 -type d -printf "%f\n" \
                         | tr '\n' ' ')
                       removed_pkgs=""
