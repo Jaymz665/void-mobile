@@ -26,30 +26,9 @@ jobs:
             matrix:
                 config:
                     - {
-                          arch: x86_64,
-                          host: x86_64,
-                          libc: glibc,
-                          platform: linux/amd64,
-                          test: 1,
-                      }
-                    - {
                           arch: aarch64,
                           host: x86_64,
                           libc: glibc,
-                          platform: linux/amd64,
-                          test: 0,
-                      }
-                    - {
-                          arch: x86_64-musl,
-                          host: x86_64-musl,
-                          libc: musl,
-                          platform: linux/amd64,
-                          test: 1,
-                      }
-                    - {
-                          arch: aarch64-musl,
-                          host: x86_64-musl,
-                          libc: musl,
                           platform: linux/amd64,
                           test: 0,
                       }
@@ -171,8 +150,11 @@ jobs:
                       etc/xbps.d/repos-remote-aarch64.conf
                   sed -i '1i repository=https://mirror.black-hole.dev/aarch64-musl' \
                       etc/xbps.d/repos-remote-aarch64-musl.conf
-                  printf '%s' "$PUBLIC_KEY_OF_XBPS_REPO" | base64 -d \
-                    > "common/repo-keys/$PUBLIC_KEY_OF_XBPS_REPO_NAME"
+
+                  if [ -n "$PUBLIC_KEY_OF_XBPS_REPO_NAME" ] && [ -n "$PUBLIC_KEY_OF_XBPS_REPO" ]; then
+                      printf '%s' "$PUBLIC_KEY_OF_XBPS_REPO" | base64 -d \
+                        > "common/repo-keys/$PUBLIC_KEY_OF_XBPS_REPO_NAME"
+                  fi
 
                   # Allow chroot breakout to bypass unshare restrictions inside container
                   echo "XBPS_ALLOW_CHROOT_BREAKOUT=yes" >> etc/conf
@@ -229,7 +211,7 @@ jobs:
                   echo "failed=$failed" >> "$GITHUB_OUTPUT"
 
             - name: Setup SSH
-              if: ${{ steps.changed.outputs.pkgs != '' || steps.changed.outputs.removed != '' }}
+              if: ${{ (steps.changed.outputs.pkgs != '' || steps.changed.outputs.removed != '') && secrets.SSH_PRIV != '' }}
               env:
                   SSH_PRIV: ${{ secrets.SSH_PRIV }}
                   SSH_MIRROR_SECRET_KEY_NAME: ${{ secrets.SSH_MIRROR_SECRET_KEY_NAME }}
@@ -246,7 +228,7 @@ jobs:
                   chown -R builder:builder /home/builder/.ssh
 
             - name: Upload built packages
-              if: ${{ steps.changed.outputs.pkgs != '' || steps.changed.outputs.removed != '' }}
+              if: ${{ (steps.changed.outputs.pkgs != '' || steps.changed.outputs.removed != '') && secrets.SSH_PRIV != '' }}
               working-directory: void-packages/hostdir/binpkgs
               env:
                   SSH_MIRROR_SECRET_KEY_NAME: ${{ secrets.SSH_MIRROR_SECRET_KEY_NAME }}
@@ -276,7 +258,7 @@ jobs:
                       "${SSH_MIRROR_USER}@${SSH_MIRROR_HOST}:$SSH_MIRROR_HOME/INCOMING/${XBPS_ARCH}/"
 
             - name: Deploy repository on mirror
-              if: ${{ steps.changed.outputs.pkgs != '' || steps.changed.outputs.removed != '' }}
+              if: ${{ (steps.changed.outputs.pkgs != '' || steps.changed.outputs.removed != '') && secrets.SSH_PRIV != '' }}
               env:
                   SSH_MIRROR_SECRET_KEY_NAME: ${{ secrets.SSH_MIRROR_SECRET_KEY_NAME }}
                   SSH_MIRROR_USER: ${{ secrets.SSH_MIRROR_USER }}
