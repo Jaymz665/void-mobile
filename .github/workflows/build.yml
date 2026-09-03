@@ -14,40 +14,34 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
-    # Запускаем сборку прямо в контейнере Void Linux
     container:
       image: ghcr.io/void-linux/void-glibc-full:20250616R1
       options: --privileged
 
     steps:
-      # 1. Устанавливаем минимально необходимые зависимости для работы самого GitHub Runner (включая libstdc++ для Node.js)
       - name: Install runner dependencies
         run: |
           xbps-install -Syu xbps
           xbps-install -yu
           xbps-install -y libstdc++ bash git sudo rsync coreutils
 
-      # 2. Скачиваем код (теперь Node.js запустится без ошибок, так как libstdc++ установлена)
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      # 3. Настраиваем безопасные директории Git и пользователя builder
       - name: Prepare build environment
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           useradd -m builder || true
           chown -R builder:builder "$GITHUB_WORKSPACE"
 
-      # 4. Вычисляем изменённые шаблоны и собираем их
       - name: Build all packages in srcpkgs
         env:
           ARCH: aarch64
         run: |
           export PATH="/opt/xbps/usr/bin:$PATH"
 
-          # Получаем список всех папок из srcpkgs
           PKGS=$(ls -1 srcpkgs | tr '\n' ' ')
 
           if [ -z "$PKGS" ]; then
@@ -57,14 +51,12 @@ jobs:
 
           echo "Найдены пакеты для сборки: $PKGS"
 
-          # Инициализируем chroot
-          sudo -Eu builder ./xbps-src binary-bootstrap
+          sudo -Eu builder sh -c "cd $GITHUB_WORKSPACE && ./xbps-src binary-bootstrap"
 
-          # Сортируем с учётом зависимостей и собираем
-          SORTED_PKGS=$(sudo -Eu builder ./xbps-src sort-dependencies $PKGS)
+          SORTED_PKGS=$(sudo -Eu builder sh -c "cd $GITHUB_WORKSPACE && ./xbps-src sort-dependencies $PKGS")
 
           for pkg in $SORTED_PKGS; do
             echo "::group::Сборка $pkg ($ARCH)"
-            sudo -Eu builder ./xbps-src -j$(nproc) -a "$ARCH" pkg "$pkg"
+            sudo -Eu builder sh -c "cd $GITHUB_WORKSPACE && ./xbps-src -j\$(nproc) -a $ARCH pkg $pkg"
             echo "::endgroup::"
           done
