@@ -69,7 +69,6 @@ jobs:
                   base="${{ github.event.before }}"
                   tip="${{ github.sha }}"
 
-                  # Если запуск ручной (workflow_dispatch) или первый коммит — собираем ВСЕ пакеты в srcpkgs/
                   if [ "${{ github.event_name }}" = "workflow_dispatch" ] || [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ]; then
                       changed_pkgs=$(find srcpkgs -maxdepth 1 -mindepth 1 -type d -printf "%f\n" \
                         | tr '\n' ' ')
@@ -145,16 +144,6 @@ jobs:
               run: |
                   cd void-packages
 
-                  # adding black-hole mirror to conf
-                  sed -i '1i repository=https://mirror.black-hole.dev/x86_64' \
-                      etc/xbps.d/repos-remote.conf
-                  sed -i '1i repository=https://mirror.black-hole.dev/x86_64-musl' \
-                      etc/xbps.d/repos-remote-musl.conf
-                  sed -i '1i repository=https://mirror.black-hole.dev/aarch64' \
-                      etc/xbps.d/repos-remote-aarch64.conf
-                  sed -i '1i repository=https://mirror.black-hole.dev/aarch64-musl' \
-                      etc/xbps.d/repos-remote-aarch64-musl.conf
-
                   if [ -n "$PUBLIC_KEY_OF_XBPS_REPO_NAME" ] && [ -n "$PUBLIC_KEY_OF_XBPS_REPO" ]; then
                       printf '%s' "$PUBLIC_KEY_OF_XBPS_REPO" | base64 -d \
                         > "common/repo-keys/$PUBLIC_KEY_OF_XBPS_REPO_NAME"
@@ -214,84 +203,10 @@ jobs:
                   echo "built=$built" >> "$GITHUB_OUTPUT"
                   echo "failed=$failed" >> "$GITHUB_OUTPUT"
 
-            - name: Setup SSH
-              if: ${{ steps.changed.outputs.pkgs != '' || steps.changed.outputs.removed != '' }}
-              env:
-                  SSH_PRIV: ${{ secrets.SSH_PRIV }}
-                  SSH_MIRROR_SECRET_KEY_NAME: ${{ secrets.SSH_MIRROR_SECRET_KEY_NAME }}
-                  SSH_MIRROR_HOST: ${{ secrets.SSH_MIRROR_HOST }}
-                  SSH_MIRROR_PORT: ${{ secrets.SSH_MIRROR_PORT }}
-              run: |
-                  if [ -z "$SSH_PRIV" ]; then
-                      echo "SSH_PRIV secret is missing, skipping SSH setup."
-                      exit 0
-                  fi
-                  set -eux
-                  mkdir -p /home/builder/.ssh
-                  printf "%s\n" "$SSH_PRIV" > "/home/builder/.ssh/${SSH_MIRROR_SECRET_KEY_NAME}"
-                  chmod 700 /home/builder/.ssh
-                  chmod 600 "/home/builder/.ssh/$SSH_MIRROR_SECRET_KEY_NAME"
-                  ssh-keyscan -p "${SSH_MIRROR_PORT}" "${SSH_MIRROR_HOST}" > "/home/builder/.ssh/known_hosts"
-                  chmod 644 /home/builder/.ssh/known_hosts
-                  chown -R builder:builder /home/builder/.ssh
-
-            - name: Upload built packages
-              if: ${{ steps.changed.outputs.pkgs != '' || steps.changed.outputs.removed != '' }}
-              working-directory: void-packages/hostdir/binpkgs
-              env:
-                  SSH_PRIV: ${{ secrets.SSH_PRIV }}
-                  SSH_MIRROR_SECRET_KEY_NAME: ${{ secrets.SSH_MIRROR_SECRET_KEY_NAME }}
-                  SSH_MIRROR_USER: ${{ secrets.SSH_MIRROR_USER }}
-                  SSH_MIRROR_HOST: ${{ secrets.SSH_MIRROR_HOST }}
-                  SSH_MIRROR_PORT: ${{ secrets.SSH_MIRROR_PORT }}
-                  SSH_MIRROR_HOME: ${{ secrets.SSH_MIRROR_HOME }}
-                  XBPS_ARCH: ${{ matrix.config.arch }}
-
-              run: |
-                  if [ -z "$SSH_PRIV" ]; then
-                      echo "SSH_PRIV secret is missing, skipping upload."
-                      exit 0
-                  fi
-                  set -eu
-
-                  mkdir -p /tmp/upload
-
-                  cp -v ./*.xbps /tmp/upload/ 2>/dev/null || true
-
-                  printf "%s\n" "${{ steps.changed.outputs.removed }}" \
-                      | tr ' ' '\n' \
-                      > /tmp/upload/removed.txt
-
-                  sudo -Eu builder rsync -avz --ignore-existing \
-                      -e "ssh -p $SSH_MIRROR_PORT \
-                      -i /home/builder/.ssh/$SSH_MIRROR_SECRET_KEY_NAME \
-                      -o StrictHostKeyChecking=no \
-                      -o BatchMode=yes" \
-                      /tmp/upload/ \
-                      "${SSH_MIRROR_USER}@${SSH_MIRROR_HOST}:$SSH_MIRROR_HOME/INCOMING/${XBPS_ARCH}/"
-
-            - name: Deploy repository on mirror
-              if: ${{ steps.changed.outputs.pkgs != '' || steps.changed.outputs.removed != '' }}
-              env:
-                  SSH_PRIV: ${{ secrets.SSH_PRIV }}
-                  SSH_MIRROR_SECRET_KEY_NAME: ${{ secrets.SSH_MIRROR_SECRET_KEY_NAME }}
-                  SSH_MIRROR_USER: ${{ secrets.SSH_MIRROR_USER }}
-                  SSH_MIRROR_HOST: ${{ secrets.SSH_MIRROR_HOST }}
-                  SSH_MIRROR_PORT: ${{ secrets.SSH_MIRROR_PORT }}
-                  SSH_MIRROR_HOME: ${{ secrets.SSH_MIRROR_HOME }}
-                  MIRROR_PATH: ${{ secrets.MIRROR_PATH }}
-                  XBPS_ARCH: ${{ matrix.config.arch }}
-              run: |
-                  if [ -z "$SSH_PRIV" ]; then
-                      echo "SSH_PRIV secret is missing, skipping deploy."
-                      exit 0
-                  fi
-                  set -eu
-
-                  sudo -Eu builder ssh \
-                      -p "$SSH_MIRROR_PORT" \
-                      -i "/home/builder/.ssh/$SSH_MIRROR_SECRET_KEY_NAME" \
-                      -o StrictHostKeyChecking=no \
-                      -o BatchMode=yes \
-                      "${SSH_MIRROR_USER}@${SSH_MIRROR_HOST}" \
-                      "${SSH_MIRROR_HOME}/sing-packages.sh '$XBPS_ARCH' '$MIRROR_PATH'"
+            - name: Upload packages as GitHub Artifacts
+              if: ${{ steps.changed.outputs.pkgs != '' }}
+              uses: actions/upload-artifact@v4
+              with:
+                  name: xbps-packages-${{ matrix.config.arch }}
+                  path: void-packages/hostdir/binpkgs/*.xbps
+                  if-no-files-found: ignore
