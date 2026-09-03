@@ -46,7 +46,7 @@ jobs:
                   mkdir -p /etc/xbps.d && cp /usr/share/xbps.d/*-repository-*.conf /etc/xbps.d/
                   sed -i 's|repo-default|repo-ci|g' /etc/xbps.d/*-repository-*.conf
 
-                  # Подключение вашего репозитория GitHub Pages в системный xbps контейнера
+                  # Подключение опубликованного репозитория в системный xbps контейнера
                   echo "repository=https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/${{ matrix.config.arch }}" > /etc/xbps.d/20-custom-repo.conf
 
                   # install dependencies
@@ -228,13 +228,19 @@ jobs:
                       git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git"
                   fi
 
+                  # Отключаем обработчик Jekyll для GitHub Pages
+                  touch .nojekyll
+
                   ARCH_DIR="${{ matrix.config.arch }}"
                   mkdir -p "$ARCH_DIR"
-                  cp -v ../void-packages/hostdir/binpkgs/*.xbps "$ARCH_DIR/" 2>/dev/null || true
+
+                  # Копируем ТОЛЬКО целевую архитектуру (aarch64)
+                  cp -v ../void-packages/hostdir/binpkgs/*."${ARCH_DIR}".xbps "$ARCH_DIR/" 2>/dev/null || true
 
                   cd "$ARCH_DIR"
 
-                  xbps-rindex -a *.xbps
+                  # Индексация исключительно пакетов aarch64
+                  xbps-rindex -a *."${ARCH_DIR}".xbps
                   xbps-rindex -c .
 
                   if [ -n "$PRIVATE_KEY_OF_XBPS_REPO" ] && [ -n "$PRIVATE_KEY_OF_XBPS_REPO_NAME" ]; then
