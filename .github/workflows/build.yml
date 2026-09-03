@@ -9,74 +9,73 @@ on:
       - main
       - master
   workflow_dispatch:
-    inputs:
-      forced_package:
-        description: 'Имя пакета для принудительной сборки'
-        required: false
-        type: string
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
+    # Запускаем сборку прямо в контейнере Void Linux
+    container:
+      image: ghcr.io/void-linux/void-glibc-full:20250616R1
+      options: --privileged
+
     steps:
+      # 1. Устанавливаем минимально необходимые зависимости для работы самого GitHub Runner (включая libstdc++ для Node.js)
+      - name: Install runner dependencies
+        run: |
+          xbps-install -Syu xbps
+          xbps-install -yu
+          xbps-install -y libstdc++ bash git sudo rsync coreutils
+
+      # 2. Скачиваем код (теперь Node.js запустится без ошибок, так как libstdc++ установлена)
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Build inside Void Linux Docker
+      # 3. Настраиваем безопасные директории Git и пользователя builder
+      - name: Prepare build environment
         run: |
-          docker run --privileged --rm \
-            -v ${{ github.workspace }}:/void-packages \
-            -w /void-packages \
-            -e GITHUB_BASE_REF="${{ github.base_ref }}" \
-            -e FORCED_PACKAGE="${{ github.event.inputs.forced_package }}" \
-            ghcr.io/void-linux/void-glibc-full:20250616R1 \
-            sh -c "
-              set -e
-              export PATH=\"/opt/xbps/usr/bin:\$PATH\"
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          useradd -m builder || true
+          chown -R builder:builder "$GITHUB_WORKSPACE"
 
-              echo '==> Обновление XBPS...'
-              xbps-install -Syu xbps
-              xbps-install -yu
-              xbps-install -y sudo bash git rsync coreutils
+      # 4. Вычисляем изменённые шаблоны и собираем их
+      - name: Build changed packages
+        env:
+          ARCH: aarch64
+          BOOTSTRAP: x86_64
+        run: |
+          export PATH="/opt/xbps/usr/bin:$PATH"
 
-              echo '==> Определение пакета для сборки...'
-              git config --global --add safe.directory /void-packages
+          # Ищем базовую ветку для сравнения
+          BASE_REF="${GITHUB_BASE_REF:-main}"
 
-              if [ -n \"\$FORCED_PACKAGE\" ]; then
-                PKGS=\"\$FORCED_PACKAGE\"
-              else
-                # Скачиваем ссылки, чтобы git diff нашел ветки
-                git fetch origin main:main || true
-                git fetch origin master:master || true
+          # Если main не найден локально, пытаемся привязаться к origin
+          if ! git rev-parse --verify "$BASE_REF" >/dev/null 2>&1; then
+            BASE_REF="origin/$BASE_REF"
+          fi
 
-                BASE_REF=\"\${GITHUB_BASE_REF:-main}\"
-                if ! git rev-parse --verify \"\$BASE_REF\" >/dev/null 2>&1; then
-                  BASE_REF=\"master\"
-                fi
+          echo "Сравниваем текущую ветку с $BASE_REF..."
 
-                PKGS=\$(git diff --name-only \"\$BASE_REF\"...HEAD 2>/dev/null | grep '^srcpkgs/' | cut -d/ -f2 | sort -u | tr '\n' ' ')
-              fi
+          # Находим изменённые файлы шаблонов
+          CHANGED=$(git diff --name-only "$BASE_REF"...HEAD 2>/dev/null | grep '^srcpkgs/' | cut -d/ -f2 | sort -u | tr '\n' ' ')
 
-              if [ -z \"\$PKGS\" ]; then
-                echo 'Изменённых шаблонов не найдено, пропускаем сборку.'
-                exit 0
-              fi
+          if [ -z "$CHANGED" ]; then
+            echo "Изменённых пакетов не найдено в diff. Пропускаем сборку."
+            exit 0
+          fi
 
-              echo \"==> Найдено для сборки: \$PKGS\"
+          echo "Найдены пакеты для сборки: $CHANGED"
 
-              # Настройка пользователя builder для xbps-src
-              useradd -m builder || true
-              chown -R builder:builder /void-packages
+          # Инициализируем chroot
+          sudo -Eu builder ./xbps-src binary-bootstrap
 
-              # Инициализация и сборка aarch64
-              sudo -Eu builder ./xbps-src binary-bootstrap
-              SORTED_PKGS=\$(sudo -Eu builder ./xbps-src sort-dependencies \$PKGS)
+          # Сортируем и собираем
+          SORTED_PKGS=$(sudo -Eu builder ./xbps-src sort-dependencies $CHANGED)
 
-              for pkg in \$SORTED_PKGS; do
-                echo \"==> Собираем пакет: \$pkg (aarch64)\"
-                sudo -Eu builder ./xbps-src -j\$(nproc) -a aarch64 pkg \"\$pkg\"
-              done
-            "
+          for pkg in $SORTED_PKGS; do
+            echo "::group::Сборка $pkg ($ARCH)"
+            sudo -Eu builder ./xbps-src -j$(nproc) -a "$ARCH" pkg "$pkg"
+            echo "::endgroup::"
+          done
