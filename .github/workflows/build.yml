@@ -33,7 +33,7 @@ jobs:
             -e GITHUB_BASE_REF="${{ github.base_ref }}" \
             -e FORCED_PACKAGE="${{ github.event.inputs.forced_package }}" \
             ghcr.io/void-linux/void-glibc-full:20250616R1 \
-            bash -c "
+            sh -c "
               set -e
               export PATH=\"/opt/xbps/usr/bin:\$PATH\"
 
@@ -42,28 +42,36 @@ jobs:
               xbps-install -yu
               xbps-install -y sudo bash git rsync coreutils
 
-              # Определение пакета для сборки
+              echo '==> Определение пакета для сборки...'
+              git config --global --add safe.directory /void-packages
+
               if [ -n \"\$FORCED_PACKAGE\" ]; then
                 PKGS=\"\$FORCED_PACKAGE\"
               else
-                BASE_SHA=\"origin/\${GITHUB_BASE_REF:-main}\"
-                # Загружаем git историю внутри контейнера
-                git config --global --add safe.directory /void-packages
-                PKGS=\$(git diff --name-only \"\$BASE_SHA\"...HEAD 2>/dev/null | grep '^srcpkgs/' | cut -d/ -f2 | sort -u | tr '\n' ' ')
+                # Скачиваем ссылки, чтобы git diff нашел ветки
+                git fetch origin main:main || true
+                git fetch origin master:master || true
+
+                BASE_REF=\"\${GITHUB_BASE_REF:-main}\"
+                if ! git rev-parse --verify \"\$BASE_REF\" >/dev/null 2>&1; then
+                  BASE_REF=\"master\"
+                fi
+
+                PKGS=\$(git diff --name-only \"\$BASE_REF\"...HEAD 2>/dev/null | grep '^srcpkgs/' | cut -d/ -f2 | sort -u | tr '\n' ' ')
               fi
 
               if [ -z \"\$PKGS\" ]; then
-                echo '::notice::Изменённых шаблонов не найдено, пропускаем сборку.'
+                echo 'Изменённых шаблонов не найдено, пропускаем сборку.'
                 exit 0
               fi
 
               echo \"==> Найдено для сборки: \$PKGS\"
 
-              # Настройка пользователя builder
+              # Настройка пользователя builder для xbps-src
               useradd -m builder || true
               chown -R builder:builder /void-packages
 
-              # Сборка под aarch64
+              # Инициализация и сборка aarch64
               sudo -Eu builder ./xbps-src binary-bootstrap
               SORTED_PKGS=\$(sudo -Eu builder ./xbps-src sort-dependencies \$PKGS)
 
