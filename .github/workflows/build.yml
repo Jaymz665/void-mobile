@@ -8,6 +8,7 @@ on:
         paths:
             - "srcpkgs/**"
             - ".github/workflows/**"
+            - "shlibs*"
     workflow_dispatch:
 
 jobs:
@@ -109,26 +110,21 @@ jobs:
                   fi
 
                   SHLIBS_FILE="void-packages/common/shlibs"
-                  APPEND_FILE="extra/shlibs_append"
-                  REMOVE_FILE="extra/shlibs_remove"
 
                   echo "==> updating common/shlibs..."
-                  if [ -f "$REMOVE_FILE" ]; then
+                  for f in extra/shlibs extra/shlibs_append; do
+                      if [ -f "$f" ]; then
+                          echo "   + applying $f"
+                          cat "$f" >> "$SHLIBS_FILE"
+                      fi
+                  done
+
+                  if [ -f "extra/shlibs_remove" ]; then
                       while IFS= read -r line; do
                           [ -z "$line" ] && continue
                           grep -vF "$line" "$SHLIBS_FILE" > "$SHLIBS_FILE.tmp" && mv "$SHLIBS_FILE.tmp" "$SHLIBS_FILE"
                           echo "   - removed: $line"
-                      done < "$REMOVE_FILE"
-                  fi
-
-                  if [ -f "$APPEND_FILE" ]; then
-                      while IFS= read -r line; do
-                          [ -z "$line" ] && continue
-                          if ! grep -qF "$line" "$SHLIBS_FILE"; then
-                              echo "$line" >> "$SHLIBS_FILE"
-                              echo "   + added: $line"
-                          fi
-                      done < "$APPEND_FILE"
+                      done < "extra/shlibs_remove"
                   fi
 
                   echo "=> applying inline edits..."
