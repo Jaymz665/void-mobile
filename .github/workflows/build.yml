@@ -27,8 +27,7 @@ jobs:
           mkdir -p /etc/xbps.d && cp /usr/share/xbps.d/*-repository-*.conf /etc/xbps.d/
           sed -i 's|repo-default|repo-ci|g' /etc/xbps.d/*-repository-*.conf
           xbps-install -Syu xbps && xbps-install -yu && xbps-install -y sudo bash curl git rsync
-          useradd -G xbuilder -m builder
-          echo "builder ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
+          useradd -G xbuilder -M builder
 
       - name: Checkout this repo
         run: |
@@ -47,7 +46,7 @@ jobs:
           base="${{ github.event.before }}"
           tip="${{ github.sha }}"
           if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ]; then
-            changed_pkgs=$(find srcpkgs -maxdepth 1 -mindepth 1 -type d -exec basename {} \; | tr '\n' ' ')
+            changed_pkgs=$(find srcpkgs -maxdepth 1 -mindepth 1 -type d -printf "%f\n" | tr '\n' ' ')
             removed_pkgs=""
           else
             changed_pkgs=$(git diff --name-only "$base" "$tip" --diff-filter=AM -- 'srcpkgs/*/template' | cut -d/ -f2 | sort -u | tr '\n' ' ')
@@ -63,65 +62,72 @@ jobs:
       - name: Checkout void-packages
         run: |
           git clone --depth 1 https://github.com/void-linux/void-packages.git void-packages
+          cd void-packages
+          git checkout --detach master
 
       - name: Merge templates and edit shlibs
         run: |
-          echo "==> Syncing srcpkgs to void-packages..."
-          rsync -av extra/srcpkgs/ void-packages/srcpkgs/
+          echo "==> copying templates..."
+          cp -rv extra/srcpkgs/* void-packages/srcpkgs/
 
           SHLIBS_FILE="void-packages/common/shlibs"
           APPEND_FILE="extra/shlibs_append"
           REMOVE_FILE="extra/shlibs_remove"
 
+          echo "==> updating common/shlibs..."
           if [ -f "$REMOVE_FILE" ]; then
-            echo "==> Removing shlibs entries..."
-            while IFS= read -r line || [ -n "$line" ]; do
+            while IFS= read -r line; do
               [ -z "$line" ] && continue
-              sed -i "/^${line}/d" "$SHLIBS_FILE"
+              grep -vF "$line" "$SHLIBS_FILE" > "$SHLIBS_FILE.tmp" && mv "$SHLIBS_FILE.tmp" "$SHLIBS_FILE"
+              echo "   - removed: $line"
             done < "$REMOVE_FILE"
           fi
 
           if [ -f "$APPEND_FILE" ]; then
-            echo "==> Appending custom shlibs entries..."
-            while IFS= read -r line || [ -n "$line" ]; do
+            while IFS= read -r line; do
               [ -z "$line" ] && continue
               if ! grep -qF "$line" "$SHLIBS_FILE"; then
                 echo "$line" >> "$SHLIBS_FILE"
+                echo "   + added: $line"
               fi
             done < "$APPEND_FILE"
           fi
 
-      - name: Prepare masterdir for aarch64
+      - name: Prepare masterdir
         run: |
-          # Передаем владельца папок пользователю builder до вызова скриптов
-          chown -R builder:xbuilder void-packages extra
-
-          # Выполняем подтяжку окружения от имени builder
-          su builder -c "cd void-packages && common/travis/set_mirror.sh"
-          su builder -c "cd void-packages && common/travis/prepare.sh"
-          su builder -c "cd void-packages && common/travis/fetch-xtools.sh"
-          su builder -c "cd void-packages && ./xbps-src -a $ARCH binary-bootstrap"
+          cd void-packages
+          # fetch-xtools выполняется от root, как в репозитории-примере
+          common/travis/fetch-xtools.sh
+          # права отдаются builder только перед вызовом скриптов travis
+          chown -R builder:builder .
+          sudo -Eu builder common/travis/set_mirror.sh
+          sudo -Eu builder common/travis/prepare.sh
 
       - name: Build changed packages
         id: build_step
         run: |
+          export PATH="/opt/xbps/usr/bin/:$PATH"
+          cd void-packages
+
           changed="${{ steps.changed.outputs.pkgs }}"
           if [ -z "$changed" ]; then
             echo "No changed templates, skipping build."
             exit 0
           fi
 
-          # Сортировка с учётом целевой архитектуры
-          PKGS=$(su builder -c "cd void-packages && ./xbps-src -a $ARCH sort-dependencies $changed")
+          if [ "$BOOTSTRAP" != "$ARCH" ]; then
+            arch="-a $ARCH"
+          fi
+
+          PKGS=$(sudo -Eu builder ./xbps-src sort-dependencies $changed)
           built=""
           failed=""
 
           for pkg in ${PKGS}; do
-            echo "===> Building $pkg for $ARCH..."
-            if su builder -c "cd void-packages && ./xbps-src -a $ARCH -s pkg ${pkg}"; then
+            if sudo -Eu builder ./xbps-src -j"$(nproc)" -s $arch pkg "${pkg}"; then
               built="$built $pkg"
             else
-              echo "!! Build failed for ${pkg}"
+              echo "!! build failed for ${pkg}"
               failed="$failed $pkg"
             fi
           done
@@ -133,21 +139,22 @@ jobs:
           echo "Failed packages: ${failed:-<none>}"
 
           if [ -n "$failed" ]; then
-            echo "Some packages failed to build: $failed"
+            echo "Some packages failed to build."
             exit 1
           fi
 
       - name: Index repository
+        working-directory: void-packages
         run: |
-          su builder -c "cd void-packages && xbps-rindex -a hostdir/binpkgs/*.xbps"
+          xbps-rindex -a hostdir/binpkgs/*.xbps
 
       - name: Deploy to GitHub branch
+        working-directory: extra
         run: |
-          cd extra
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
-          git checkout --orphan repository-${{ env.ARCH }}-glibc || git checkout repository-${{ env.ARCH }}-glibc
-          git rm -rf . || true
+          git branch -D repository-${{ env.ARCH }}-glibc 2>/dev/null || true
+          git checkout --orphan repository-${{ env.ARCH }}-glibc
           cp -r ../void-packages/hostdir/binpkgs/* .
           git add .
           if git diff --staged --quiet; then
