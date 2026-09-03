@@ -93,18 +93,18 @@ jobs:
 
       - name: Prepare masterdir for aarch64
         run: |
-          chown -R builder:builder void-packages extra
-          cd void-packages
-          su builder -c "common/travis/set_mirror.sh"
-          su builder -c "common/travis/prepare.sh"
-          su builder -c "common/travis/fetch-xtools.sh"
-          su builder -c "./xbps-src -a $ARCH binary-bootstrap"
+          # Передаем владельца папок пользователю builder до вызова скриптов
+          chown -R builder:xbuilder void-packages extra
+
+          # Выполняем подтяжку окружения от имени builder
+          su builder -c "cd void-packages && common/travis/set_mirror.sh"
+          su builder -c "cd void-packages && common/travis/prepare.sh"
+          su builder -c "cd void-packages && common/travis/fetch-xtools.sh"
+          su builder -c "cd void-packages && ./xbps-src -a $ARCH binary-bootstrap"
 
       - name: Build changed packages
         id: build_step
         run: |
-          cd void-packages
-
           changed="${{ steps.changed.outputs.pkgs }}"
           if [ -z "$changed" ]; then
             echo "No changed templates, skipping build."
@@ -112,13 +112,13 @@ jobs:
           fi
 
           # Сортировка с учётом целевой архитектуры
-          PKGS=$(su builder -c "./xbps-src -a $ARCH sort-dependencies $changed")
+          PKGS=$(su builder -c "cd void-packages && ./xbps-src -a $ARCH sort-dependencies $changed")
           built=""
           failed=""
 
           for pkg in ${PKGS}; do
             echo "===> Building $pkg for $ARCH..."
-            if su builder -c "./xbps-src -a $ARCH -s pkg ${pkg}"; then
+            if su builder -c "cd void-packages && ./xbps-src -a $ARCH -s pkg ${pkg}"; then
               built="$built $pkg"
             else
               echo "!! Build failed for ${pkg}"
@@ -139,8 +139,7 @@ jobs:
 
       - name: Index repository
         run: |
-          cd void-packages
-          su builder -c "xbps-rindex -a hostdir/binpkgs/*.xbps"
+          su builder -c "cd void-packages && xbps-rindex -a hostdir/binpkgs/*.xbps"
 
       - name: Deploy to GitHub branch
         run: |
