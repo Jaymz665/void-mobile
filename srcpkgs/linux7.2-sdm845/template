@@ -1,5 +1,5 @@
 # Template file for 'linux7.2-sdm845'
-pkgname=linux7.3-sdm845
+pkgname=linux7.2-sdm845
 version=7.2
 revision=1
 _commit=b3a1a8dbf1b2d5aa62ab8843b7112b72e1d974cf
@@ -8,7 +8,7 @@ maintainer="Jaymz665 <jaymz665@gmail.com>"
 license="GPL-2.0-only"
 homepage="https://www.kernel.org"
 distfiles="https://codeberg.org/sdm845/linux/archive/${_commit}.tar.gz"
-checksum=4389f4ae6f5b80174a4b2d2da93ab5afc1d3922db215ebabf7c01436494eb9f2
+checksum=5214133cc90baf2f835701cecf0991e4b61f7cc1512cc41d8922b0027326c0a5
 
 python_version=3
 archs="aarch64*"
