@@ -228,18 +228,20 @@ jobs:
                       git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git"
                   fi
 
-                  # Отключаем обработчик Jekyll для GitHub Pages
                   touch .nojekyll
 
                   ARCH_DIR="${{ matrix.config.arch }}"
                   mkdir -p "$ARCH_DIR"
 
-                  # Копируем ТОЛЬКО целевую архитектуру (aarch64)
-                  cp -v ../void-packages/hostdir/binpkgs/*."${ARCH_DIR}".xbps "$ARCH_DIR/" 2>/dev/null || true
+                  # Удаляем лишние x86_64 пакеты и устаревшие индексы хоста
+                  rm -f "$ARCH_DIR"/*.x86_64.xbps "$ARCH_DIR"/x86_64-repodata "$ARCH_DIR"/x86_64-repodata.sig
+
+                  # Копируем исключительно бинарники целевой архитектуры
+                  cp -v ../void-packages/hostdir/binpkgs/*."${ARCH_DIR}".xbps "$ARCH_DIR/" 2>/devnull || true
 
                   cd "$ARCH_DIR"
 
-                  # Индексация исключительно пакетов aarch64
+                  # Принудительная генерация aarch64-repodata
                   xbps-rindex -a *."${ARCH_DIR}".xbps
                   xbps-rindex -c .
 
@@ -252,5 +254,5 @@ jobs:
                   cd ..
 
                   git add .
-                  git commit -m "Update XBPS repository: ${{ github.sha }}" || echo "No changes to commit"
+                  git commit -m "Re-index aarch64 repository: ${{ github.sha }}" || echo "No changes to commit"
                   git push -u origin gh-pages

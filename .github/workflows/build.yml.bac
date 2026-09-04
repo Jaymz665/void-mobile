@@ -45,6 +45,10 @@ jobs:
                   # switch to repo-ci mirror
                   mkdir -p /etc/xbps.d && cp /usr/share/xbps.d/*-repository-*.conf /etc/xbps.d/
                   sed -i 's|repo-default|repo-ci|g' /etc/xbps.d/*-repository-*.conf
+
+                  # Подключение опубликованного репозитория в системный xbps контейнера
+                  echo "repository=https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/${{ matrix.config.arch }}" > /etc/xbps.d/20-custom-repo.conf
+
                   # install dependencies
                   xbps-install -Syu xbps && xbps-install -yu && xbps-install -y sudo bash curl git rsync openssh
                   # create non-root user and subuids for namespaces
@@ -115,12 +119,14 @@ jobs:
                   for f in extra/shlibs extra/shlibs_append; do
                       if [ -f "$f" ]; then
                           echo "   + applying $f"
-                          cat "$f" >> "$SHLIBS_FILE"
+                          tr -d '\r' < "$f" >> "$SHLIBS_FILE"
+                          echo "" >> "$SHLIBS_FILE"
                       fi
                   done
 
                   if [ -f "extra/shlibs_remove" ]; then
                       while IFS= read -r line; do
+                          line=$(echo "$line" | tr -d '\r')
                           [ -z "$line" ] && continue
                           grep -vF "$line" "$SHLIBS_FILE" > "$SHLIBS_FILE.tmp" && mv "$SHLIBS_FILE.tmp" "$SHLIBS_FILE"
                           echo "   - removed: $line"
@@ -147,6 +153,9 @@ jobs:
 
                   # Allow chroot breakout to bypass unshare restrictions inside container
                   echo "XBPS_ALLOW_CHROOT_BREAKOUT=yes" >> etc/conf
+
+                  # Добавляем опубликованный репозиторий GitHub Pages внутрь xbps-src
+                  echo "repository=https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/${{ matrix.config.arch }}" >> etc/conf
 
                   chown -R builder:builder . &&
                   sudo -Eu builder common/travis/set_mirror.sh &&
@@ -199,10 +208,49 @@ jobs:
                   echo "built=$built" >> "$GITHUB_OUTPUT"
                   echo "failed=$failed" >> "$GITHUB_OUTPUT"
 
-            - name: Upload packages as GitHub Artifacts
-              if: ${{ steps.changed.outputs.pkgs != '' }}
-              uses: actions/upload-artifact@v4
-              with:
-                  name: xbps-packages-${{ matrix.config.arch }}
-                  path: void-packages/hostdir/binpkgs/*.xbps
-                  if-no-files-found: ignore
+            - name: Index and Deploy to GitHub Pages Repository
+              if: success() && steps.build_step.outputs.built != ''
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                  PRIVATE_KEY_OF_XBPS_REPO: ${{ secrets.PRIVATE_KEY_OF_XBPS_REPO }}
+                  PRIVATE_KEY_OF_XBPS_REPO_NAME: ${{ secrets.PRIVATE_KEY_OF_XBPS_REPO_NAME }}
+              run: |
+                  git config --global user.name "github-actions[bot]"
+                  git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+                  mkdir -p deploy
+                  git clone --depth 1 --branch gh-pages "https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git" deploy || true
+
+                  cd deploy
+                  if [ ! -d ".git" ]; then
+                      git init
+                      git checkout -b gh-pages
+                      git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git"
+                  fi
+
+                  # Отключаем обработчик Jekyll для GitHub Pages
+                  touch .nojekyll
+
+                  ARCH_DIR="${{ matrix.config.arch }}"
+                  mkdir -p "$ARCH_DIR"
+
+                  # Копируем ТОЛЬКО целевую архитектуру (aarch64)
+                  cp -v ../void-packages/hostdir/binpkgs/*."${ARCH_DIR}".xbps "$ARCH_DIR/" 2>/dev/null || true
+
+                  cd "$ARCH_DIR"
+
+                  # Индексация исключительно пакетов aarch64
+                  xbps-rindex -a *."${ARCH_DIR}".xbps
+                  xbps-rindex -c .
+
+                  if [ -n "$PRIVATE_KEY_OF_XBPS_REPO" ] && [ -n "$PRIVATE_KEY_OF_XBPS_REPO_NAME" ]; then
+                      printf '%s' "$PRIVATE_KEY_OF_XBPS_REPO" | base64 -d > repo.pem
+                      xbps-rindex --sign --signedby "$PRIVATE_KEY_OF_XBPS_REPO_NAME" --privkey repo.pem .
+                      rm -f repo.pem
+                  fi
+
+                  cd ..
+
+                  git add .
+                  git commit -m "Update XBPS repository: ${{ github.sha }}" || echo "No changes to commit"
+                  git push -u origin gh-pages
