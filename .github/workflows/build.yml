@@ -215,6 +215,8 @@ jobs:
                   PRIVATE_KEY_OF_XBPS_REPO: ${{ secrets.PRIVATE_KEY_OF_XBPS_REPO }}
                   PRIVATE_KEY_OF_XBPS_REPO_NAME: ${{ secrets.PRIVATE_KEY_OF_XBPS_REPO_NAME }}
               run: |
+                  export PATH="/opt/xbps/usr/bin/:$PATH"
+
                   git config --global user.name "github-actions[bot]"
                   git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
@@ -233,16 +235,16 @@ jobs:
                   ARCH_DIR="${{ matrix.config.arch }}"
                   mkdir -p "$ARCH_DIR"
 
-                  # Удаляем лишние x86_64 пакеты и устаревшие индексы хоста
-                  rm -f "$ARCH_DIR"/*.x86_64.xbps "$ARCH_DIR"/x86_64-repodata "$ARCH_DIR"/x86_64-repodata.sig
-
-                  # Копируем исключительно бинарники целевой архитектуры
+                  # Копируем бинарники целевой архитектуры
                   cp -v ../void-packages/hostdir/binpkgs/*."${ARCH_DIR}".xbps "$ARCH_DIR/" 2>/devnull || true
 
                   cd "$ARCH_DIR"
 
-                  # Принудительная генерация aarch64-repodata
-                  xbps-rindex -a *."${ARCH_DIR}".xbps
+                  # Удаляем x86_64 пакеты и старые индексы
+                  rm -f *.x86_64.xbps *-repodata*
+
+                  # Принудительная генерация свежего aarch64-repodata
+                  xbps-rindex -f -a *."${ARCH_DIR}".xbps
                   xbps-rindex -c .
 
                   if [ -n "$PRIVATE_KEY_OF_XBPS_REPO" ] && [ -n "$PRIVATE_KEY_OF_XBPS_REPO_NAME" ]; then
@@ -251,8 +253,11 @@ jobs:
                       rm -f repo.pem
                   fi
 
+                  echo "=== Содержимое папки $ARCH_DIR ==="
+                  ls -la
+
                   cd ..
 
-                  git add .
+                  git add -f .
                   git commit -m "Re-index aarch64 repository: ${{ github.sha }}" || echo "No changes to commit"
                   git push -u origin gh-pages
