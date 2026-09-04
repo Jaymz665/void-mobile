@@ -243,15 +243,21 @@ jobs:
                   # Удаляем x86_64 пакеты и старые индексы
                   rm -f *.x86_64.xbps *-repodata*
 
-                  # Принудительная генерация свежего aarch64-repodata
-                  xbps-rindex -f -a *."${ARCH_DIR}".xbps
-                  xbps-rindex -c .
+                  # Переопределяем архитектуру XBPS изолированным конфигом
+                  CONF_DIR=$(mktemp -d)
+                  echo "architecture=${ARCH_DIR}" > "$CONF_DIR/architecture.conf"
+
+                  # Генерация индекса aarch64-repodata
+                  xbps-rindex -C "$CONF_DIR" -f -a *."${ARCH_DIR}".xbps
+                  xbps-rindex -C "$CONF_DIR" -c .
 
                   if [ -n "$PRIVATE_KEY_OF_XBPS_REPO" ] && [ -n "$PRIVATE_KEY_OF_XBPS_REPO_NAME" ]; then
                       printf '%s' "$PRIVATE_KEY_OF_XBPS_REPO" | base64 -d > repo.pem
-                      xbps-rindex --sign --signedby "$PRIVATE_KEY_OF_XBPS_REPO_NAME" --privkey repo.pem .
+                      xbps-rindex -C "$CONF_DIR" --sign --signedby "$PRIVATE_KEY_OF_XBPS_REPO_NAME" --privkey repo.pem .
                       rm -f repo.pem
                   fi
+
+                  rm -rf "$CONF_DIR"
 
                   echo "=== Содержимое папки $ARCH_DIR ==="
                   ls -la
@@ -259,5 +265,5 @@ jobs:
                   cd ..
 
                   git add -f .
-                  git commit -m "Re-index aarch64 repository: ${{ github.sha }}" || echo "No changes to commit"
+                  git commit -m "Re-index ${ARCH_DIR} repository: ${{ github.sha }}" || echo "No changes to commit"
                   git push -u origin gh-pages
