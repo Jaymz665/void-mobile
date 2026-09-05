@@ -1,7 +1,7 @@
 # Template file for 'linux7.2-sdm845'
 pkgname=linux7.2-sdm845
 version=7.2
-revision=1
+revision=2
 _commit=b3a1a8dbf1b2d5aa62ab8843b7112b72e1d974cf
 short_desc="Linux kernel and modules (${version%.*} series for OnePlus 6t)"
 maintainer="Jaymz665 <jaymz665@gmail.com>"
